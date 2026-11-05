@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Your sign-in link</title>
+  </head>
+  <body
+    style="
+      margin: 0;
+      padding: 0;
+      background-color: #f8fafc;
+      color: #171717;
+      font-family: &quot;Open Sans&quot;, Arial, sans-serif;
+    "
+  >
+    <div style="display: none; max-height: 0; overflow: hidden; mso-hide: all">
+      Your one-time link to sign in securely.
+    </div>
+    <table
+      role="presentation"
+      width="100%"
+      cellpadding="0"
+      cellspacing="0"
+      style="background-color: #f8fafc"
+    >
+      <tr>
+        <td align="center" style="padding: 32px 16px">
+          <table
+            role="presentation"
+            width="100%"
+            cellpadding="0"
+            cellspacing="0"
+            style="
+              max-width: 560px;
+              background-color: #ffffff;
+              border: 1px solid #e5e5e5;
+              border-top: 3px solid #6366f1;
+              border-radius: 10px;
+            "
+          >
+            <tr>
+              <td
+                style="
+                  padding: 28px 28px 24px;
+                  border-bottom: 1px solid #e5e5e5;
+                  font-size: 20px;
+                  font-weight: 700;
+                "
+              >
+                JordiOrriols.cat
+              </td>
+            </tr>
+            <tr>
+              <td style="padding: 28px">
+                <p
+                  style="
+                    margin: 0 0 12px;
+                    color: #525252;
+                    font-size: 12px;
+                    font-weight: 700;
+                    letter-spacing: 1px;
+                    text-transform: uppercase;
+                  "
+                >
+                  Welcome back
+                </p>
+                <h1 style="margin: 0 0 16px; font-size: 26px; line-height: 34px; font-weight: 600">
+                  Your sign-in link
+                </h1>
+                <p style="margin: 0 0 24px; color: #525252; font-size: 16px; line-height: 26px">
+                  Use the button below to sign in to your account. This link expires shortly and can
+                  only be used once.
+                </p>
+                <table role="presentation" cellpadding="0" cellspacing="0">
+                  <tr>
+                    <td bgcolor="#262626" style="border-radius: 6px; mso-padding-alt: 14px 24px">
+                      <a
+                        href="{{ .ConfirmationURL }}"
+                        style="
+                          display: inline-block;
+                          padding: 14px 24px;
+                          color: #ffffff;
+                          font-size: 15px;
+                          font-weight: 600;
+                          line-height: 22px;
+                          text-decoration: none;
+                        "
+                        >Sign in</a
+                      >
+                    </td>
+                  </tr>
+                </table>
+                <p style="margin: 24px 0 0; color: #525252; font-size: 14px; line-height: 22px">
+                  Keep this link private. If you didn't request it, you can safely ignore this
+                  email.
+                </p>
+                <p style="margin: 24px 0 0; color: #525252; font-size: 12px; line-height: 20px">
+                  Button not working? Copy this link into your browser:<br /><a
+                    href="{{ .ConfirmationURL }}"
+                    style="
+                      color: #4338ca;
+                      text-decoration: underline;
+                      word-break: break-all;
+                      overflow-wrap: anywhere;
+                    "
+                    >{{ .ConfirmationURL }}</a
+                  >
+                </p>
+              </td>
+            </tr>
+            <tr>
+              <td
+                style="
+                  padding: 20px 28px;
+                  border-top: 1px solid #e5e5e5;
+                  color: #525252;
+                  font-size: 12px;
+                  line-height: 20px;
+                "
+              >
+                One account for Planner, Ladders and Pulse.<br />An account email from
+                JordiOrriols.cat.
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>

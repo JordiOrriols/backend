@@ -1,0 +1,14 @@
+node_modules/
+coverage/
+.DS_Store
+*.log
+.env
+.env.*
+!.env.example
+
+# Supabase CLI state
+supabase/.branches/
+supabase/.temp/
+
+# Database backups (personal data, never commit)
+backups/

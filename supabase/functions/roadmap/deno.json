@@ -1,0 +1,11 @@
+{
+  "imports": {
+    "@supabase/supabase-js": "npm:@supabase/supabase-js@2.117.2",
+    "date-fns": "npm:date-fns@3.6.0",
+    "zod": "npm:zod@3.24.2",
+    "@/i18n": "./i18n.ts",
+    "@/lib/planning": "../../../src/lib/planning.ts",
+    "@/types/planner": "../../../src/types/planner.ts",
+    "../../../src/lib/barcelonaHolidays": "../../../src/lib/barcelonaHolidays.ts"
+  }
+}

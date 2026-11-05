@@ -1,0 +1,61 @@
+{
+  "name": "@jordiorriols/backend",
+  "version": "0.1.0",
+  "description": "Shared Supabase schema, migrations and database test helpers for the JordiOrriols apps",
+  "type": "module",
+  "engines": {
+    "node": ">=26.0.0"
+  },
+  "exports": {
+    "./testing": {
+      "types": "./testing/migratedDatabase.d.ts",
+      "import": "./testing/migratedDatabase.js"
+    },
+    "./migrations/*": "./supabase/migrations/*",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "testing",
+    "supabase/migrations"
+  ],
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "db:start": "supabase start",
+    "db:stop": "supabase stop",
+    "db:test": "supabase test db",
+    "db:new": "supabase migration new",
+    "db:push:dry": "supabase db push --linked --dry-run",
+    "db:push": "supabase db push --linked",
+    "db:backup": "scripts/backup-db.sh"
+  },
+  "peerDependencies": {
+    "@electric-sql/pglite": ">=0.3.14 <0.4"
+  },
+  "peerDependenciesMeta": {
+    "@electric-sql/pglite": {
+      "optional": true
+    }
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/JordiOrriols/backend.git"
+  },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com/@jordiorriols"
+  },
+  "author": "Jordi Orriols",
+  "license": "MIT",
+  "devDependencies": {
+    "@electric-sql/pglite": "^0.3.16",
+    "@types/node": "^24.19.2",
+    "jsdom": "^27.4.0",
+    "prettier": "^3.9.10",
+    "supabase": "^3.0.0",
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.12"
+  }
+}

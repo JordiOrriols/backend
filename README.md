@@ -103,6 +103,11 @@ for workspace deletion; revoke the link to clear otherwise orphaned snapshots.
 Deploy this migration and the Planner roadmap Edge Function before releasing
 the new client, only with explicit approval.
 
+`20261107100000_planner_marker_renaming.sql` permits authenticated workspace
+owners/editors to update only a marker's name. RLS still rejects viewers and
+unrelated accounts; IDs, dates and workspace identity are not writable through
+this grant. Apply it with approval before releasing marker edit controls.
+
 Apps install `@jordiorriols/backend` as a dev dependency from GitHub Packages, the same way as
 `@jordiorriols/ui`, and test their own code against the real schema:
 

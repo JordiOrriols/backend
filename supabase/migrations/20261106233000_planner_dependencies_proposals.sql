@@ -15,15 +15,15 @@ begin
     ) limit 1;
   if found then raise exception 'Invalid dependencies for "%": choose other features in this workspace', invalid_name using errcode = '23514'; end if;
   if exists (
-    with recursive paths(origin, node, visited, cycle) as (
-      select f.id, d.id, array[f.id, d.id], f.id = d.id
+    with recursive paths(origin, node) as (
+      select f.id, d.id
       from public.features f join public.projects p on p.id = f.project_id
       cross join lateral unnest(f.dependency_ids) d(id) where p.workspace_id = workspace
-      union all
-      select paths.origin, d.id, paths.visited || d.id, d.id = any(paths.visited)
+      union
+      select paths.origin, d.id
       from paths join public.features f on f.id = paths.node
-      cross join lateral unnest(f.dependency_ids) d(id) where not paths.cycle
-    ) select 1 from paths where cycle
+      cross join lateral unnest(f.dependency_ids) d(id)
+    ) select 1 from paths where origin = node
   ) then raise exception 'Feature dependencies cannot contain a cycle' using errcode = '23514'; end if;
   select f.name, parent.name into invalid_name, prerequisite
     from public.features f join public.projects p on p.id = f.project_id

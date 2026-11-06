@@ -65,6 +65,24 @@ The email templates are installed by hand; see [supabase/templates](supabase/tem
 
 ## Use the package in an app
 
+### Workspace lifecycle
+
+The workspace-lifecycle migration stops automatic default-team/workspace creation
+for **new** accounts. Existing accounts and workspaces are not changed. Apps use
+the shared UI to offer explicit creation or waiting for an invitation.
+
+`delete_workspace(workspace uuid)` requires the authenticated workspace owner.
+It locks the workspace, its teams and projects before checking content across
+Ladders, Planner, Pulse, Shiplog and Agents. Members, features, milestones, surveys,
+retrospectives, actions, tasks, Shiplog applications and audit history prevent
+deletion; empty teams (including legacy default teams) and projects are discarded.
+Collaborators and public-link settings alone do not count as content.
+Direct REST deletion also rejects nonempty workspaces. Automatic cleanup when the
+last legacy team disappears now uses the same cross-app content checks.
+
+Deploy this migration before updating consumers. Production deployment still needs
+explicit approval, a fresh backup and a reviewed dry run.
+
 Apps install `@jordiorriols/backend` as a dev dependency from GitHub Packages, the same way as
 `@jordiorriols/ui`, and test their own code against the real schema:
 

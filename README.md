@@ -83,6 +83,26 @@ last legacy team disappears now uses the same cross-app content checks.
 Deploy this migration before updating consumers. Production deployment still needs
 explicit approval, a fresh backup and a reviewed dry run.
 
+### Planner dependencies and proposals
+
+`20261106233000_planner_dependencies_proposals.sql` adds multiple feature
+prerequisites within one workspace (including other projects). Deferred
+constraints validate the graph and full priority ordering at commit, protecting
+direct REST writes as well as Planner RPCs. Referenced prerequisites cannot be
+deleted or removed from the roadmap.
+
+Public priority experiments never update official features. Verified authenticated
+link holders may save named snapshots through `planner_save_priority_proposal`,
+using the matching opaque live-source revision to reject stale previews/saves.
+Anonymous token-scoped listing exposes only proposal IDs, names and creation
+dates. Raw snapshots, estimates and roster inputs remain service-only; the
+Planner Edge Function computes and returns the redacted public projection.
+Revoking a share token cascades to its proposals. Saved proposals count as content
+for workspace deletion; revoke the link to clear otherwise orphaned snapshots.
+
+Deploy this migration and the Planner roadmap Edge Function before releasing
+the new client, only with explicit approval.
+
 Apps install `@jordiorriols/backend` as a dev dependency from GitHub Packages, the same way as
 `@jordiorriols/ui`, and test their own code against the real schema:
 

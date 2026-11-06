@@ -13,6 +13,7 @@ repository is the only place that schema lives.
 | `tests`                | Database tests per app, run on PGlite (no Docker needed)                  |
 | `testing`              | The PGlite helper published for the apps' own contract tests              |
 | `scripts/backup-db.sh` | Full, restorable backup of the hosted database                            |
+| `docs`                 | Notes on past migrations ([Planner](docs/planner-migrations.md))          |
 
 The Planner `roadmap` Edge Function stays in the Planner repository: it reuses
 Planner's scheduling code, so moving it here would mean copying that code.

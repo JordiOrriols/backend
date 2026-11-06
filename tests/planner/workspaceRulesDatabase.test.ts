@@ -311,7 +311,7 @@ describe("Features belong to a project", () => {
     ).rejects.toThrow(/Workspace edit access required/);
   });
 
-  it("keeps projects with features, but deleting the workspace removes everything", async () => {
+  it("keeps projects and workspaces until their features have been removed", async () => {
     db = await createMigratedDatabase(accounts);
     await login(owner);
     const workspace = await createWorkspace("Squad");
@@ -326,7 +326,11 @@ describe("Features belong to a project", () => {
     expect(await rows("delete from public.projects where id = $1 returning id", [empty])).toEqual([
       { id: empty },
     ]);
-    await db.query("delete from public.workspaces where id = $1", [workspace]);
+    await expect(
+      db.query("delete from public.workspaces where id = $1", [workspace])
+    ).rejects.toThrow(/Workspace is not empty/);
+    await db.query("delete from public.features where project_id = $1", [project]);
+    await db.query("select public.delete_workspace($1)", [workspace]);
     await login(null, "postgres");
     expect(await rows("select id from public.features")).toEqual([]);
     expect(await rows("select id from public.projects")).toEqual([]);

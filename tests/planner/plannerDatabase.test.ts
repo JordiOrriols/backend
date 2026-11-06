@@ -28,7 +28,9 @@ beforeAll(async () => {
   ]);
 });
 beforeEach(async () => {
-  await db.exec("reset role; delete from public.workspaces where not created_for_team");
+  await db.exec(
+    "reset role; delete from public.features; delete from public.workspaces where not created_for_team"
+  );
   await login(owner);
   const created = await db.query<{ id: string }>("select id from public.create_workspace('Squad')");
   workspace = created.rows[0]!.id;

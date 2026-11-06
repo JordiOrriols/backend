@@ -65,6 +65,18 @@ afterEach(async () => {
 });
 
 describe("feature dependencies", () => {
+  it("validates dense acyclic graphs without enumerating every possible path", async () => {
+    await db.query(
+      "insert into public.features(project_id,name,priority) select $1,'Dense ' || n,n from generate_series(5,24) n",
+      [project]
+    );
+    await db.query("update public.features set in_backlog=false");
+    await db.query(
+      "update public.features f set dependency_ids=coalesce((select array_agg(parent.id) from public.features parent where parent.priority<f.priority),'{}')"
+    );
+    const last = await value<string>("select id as value from public.features where priority=24");
+    await expect(dependencies(ids[0]!, [last])).rejects.toThrow(/cycle/);
+  });
   it("supports multiple cross-project prerequisites and rejects direct and RPC invalid orders atomically", async () => {
     await dependencies(ids[1]!, [ids[0]!]);
     await dependencies(ids[2]!, [ids[0]!, ids[1]!]);

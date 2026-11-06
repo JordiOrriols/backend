@@ -219,6 +219,51 @@ describe("agents runner queue", () => {
     await expect(finish(id)).rejects.toThrow("Agents editor access required");
   });
 
+  it("shows the model and tokens of a run in progress without touching the totals", async () => {
+    await login(owner);
+    const task = await createTask("Live");
+    await login(runner);
+    await claim();
+    const report = (name: string, generated: number, total: number) =>
+      db.query(
+        `select public.agents_report_progress(task => $1, runner_name => $2,
+          run_model => 'ollama/qwen3.8', run_tokens_generated => $3, run_tokens_total => $4)`,
+        [task, name, generated, total]
+      );
+    const figures = () =>
+      rows<Record<string, unknown>>(
+        `select model, live_tokens_generated, live_tokens_total, tokens_total
+         from public.agent_tasks where id = $1`,
+        [task]
+      );
+
+    await report("mac", 50, 400);
+    expect(await figures()).toEqual([
+      {
+        model: "ollama/qwen3.8",
+        live_tokens_generated: 50,
+        live_tokens_total: 400,
+        tokens_total: 0,
+      },
+    ]);
+    await expect(report("other", 1, 1)).rejects.toThrow("not running on this runner");
+    await login(viewer);
+    await expect(report("mac", 1, 1)).rejects.toThrow();
+    await login(runner);
+    await finish(task);
+    await expect(report("mac", 1, 1)).rejects.toThrow("not running on this runner");
+    expect((await figures())[0]).toMatchObject({ tokens_total: 1000 });
+  });
+
+  it("does not let anonymous visitors report progress", async () => {
+    await login(null);
+    await expect(
+      db.query(
+        `select public.agents_report_progress('00000000-0000-4000-8000-000000000000', 'mac', '', 0, 0)`
+      )
+    ).rejects.toThrow("permission denied");
+  });
+
   it("fails the tasks a restarted runner left running", async () => {
     await login(owner);
     const id = await createTask("Interrupted");

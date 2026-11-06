@@ -85,4 +85,6 @@ database against app code (Zod contracts, the scheduler, and so on).
 ## Publishing
 
 Every push to `main` publishes the next patch version to GitHub Packages once the checks pass,
-then commits the bump and a `vX.Y.Z` tag back to `main`.
+then commits the bump and a `vX.Y.Z` tag back to `main`. `main` is protected by a ruleset that
+only accepts pull requests, so that push uses the `RELEASE_DEPLOY_KEY` secret: a write deploy key
+that is the ruleset's only direct-push bypass.

@@ -1,20 +1,27 @@
 import "reflect-metadata";
 import {
   Controller,
+  Body,
   BadRequestException,
   ForbiddenException,
+  ConflictException,
+  NotFoundException,
   Get,
   Headers,
   Logger,
   Module,
   Param,
   ParseUUIDPipe,
+  Post,
+  Patch,
+  Delete,
   ServiceUnavailableException,
 } from "@nestjs/common";
 import { NestFactory } from "@nestjs/core";
 import { AccessVerifier } from "./access.js";
 import { APPLICATIONS, PlatformDatabase } from "./database.js";
 import { buildPublicRoadmap } from "./scheduler.mjs";
+import { priorityInput, proposalInput, markerInput, markerNameInput } from "./planner-input.js";
 
 function required(name: string): string {
   const value = process.env[name];
@@ -27,6 +34,89 @@ const database = new PlatformDatabase(required("DATABASE_URL"));
 
 @Controller("api")
 class PlatformController {
+  @Get("planner/workspaces/:workspace/markers")
+  async markers(
+    @Headers("cf-access-jwt-assertion") token: string | undefined,
+    @Param("workspace", new ParseUUIDPipe()) workspace: string
+  ) {
+    return this.execute(token, (id) => database.plannerMarkers(id, workspace));
+  }
+
+  @Post("planner/workspaces/:workspace/markers")
+  async createMarker(
+    @Headers("cf-access-jwt-assertion") token: string | undefined,
+    @Param("workspace", new ParseUUIDPipe()) workspace: string,
+    @Body() body: unknown
+  ) {
+    return this.execute(token, (id) => {
+      const input = markerInput(body);
+      return database.plannerMarker(id, workspace, "create", null, input.name, input.date);
+    });
+  }
+
+  @Patch("planner/workspaces/:workspace/markers/:marker")
+  async renameMarker(
+    @Headers("cf-access-jwt-assertion") token: string | undefined,
+    @Param("workspace", new ParseUUIDPipe()) workspace: string,
+    @Param("marker", new ParseUUIDPipe()) marker: string,
+    @Body() body: unknown
+  ) {
+    return this.execute(token, (id) =>
+      database.plannerMarker(id, workspace, "rename", marker, markerNameInput(body), null)
+    );
+  }
+
+  @Delete("planner/workspaces/:workspace/markers/:marker")
+  async deleteMarker(
+    @Headers("cf-access-jwt-assertion") token: string | undefined,
+    @Param("workspace", new ParseUUIDPipe()) workspace: string,
+    @Param("marker", new ParseUUIDPipe()) marker: string
+  ) {
+    return this.execute(token, (id) =>
+      database.plannerMarker(id, workspace, "delete", marker, null, null)
+    );
+  }
+  @Post("planner/workspaces/:workspace/preview")
+  async preview(
+    @Headers("cf-access-jwt-assertion") token: string | undefined,
+    @Param("workspace", new ParseUUIDPipe()) workspace: string,
+    @Body() body: unknown
+  ) {
+    return this.execute(token, async (id) =>
+      buildPublicRoadmap(await database.plannerPreview(id, workspace, priorityInput(body)))
+    );
+  }
+
+  @Get("planner/workspaces/:workspace/proposals")
+  async proposals(
+    @Headers("cf-access-jwt-assertion") token: string | undefined,
+    @Param("workspace", new ParseUUIDPipe()) workspace: string
+  ) {
+    return this.execute(token, (id) => database.plannerProposals(id, workspace));
+  }
+
+  @Get("planner/workspaces/:workspace/proposals/:proposal")
+  async savedProposal(
+    @Headers("cf-access-jwt-assertion") token: string | undefined,
+    @Param("workspace", new ParseUUIDPipe()) workspace: string,
+    @Param("proposal", new ParseUUIDPipe()) proposal: string
+  ) {
+    return this.execute(token, async (id) =>
+      buildPublicRoadmap(await database.plannerSavedProposal(id, workspace, proposal))
+    );
+  }
+
+  @Post("planner/workspaces/:workspace/proposals")
+  async saveProposal(
+    @Headers("cf-access-jwt-assertion") token: string | undefined,
+    @Param("workspace", new ParseUUIDPipe()) workspace: string,
+    @Body() body: unknown
+  ) {
+    return this.execute(token, async (id) => ({
+      id: await database.plannerSaveProposal(id, workspace, proposalInput(body)),
+    }));
+  }
+
   @Get("planner/workspaces/:workspace/roadmap")
   async roadmap(
     @Headers("cf-access-jwt-assertion") token: string | undefined,
@@ -43,8 +133,15 @@ class PlatformController {
       const account = await database.account(identity);
       return await operation(account.id);
     } catch (error) {
+      if (error instanceof BadRequestException) throw error;
       if (error instanceof Error && "code" in error && error.code === "42501")
         throw new ForbiddenException("Workspace access required");
+      if (error instanceof Error && "code" in error && error.code === "23514")
+        throw new ConflictException(error.message);
+      if (error instanceof Error && "code" in error && error.code === "22023")
+        throw new BadRequestException(error.message);
+      if (error instanceof Error && "code" in error && error.code === "P0002")
+        throw new NotFoundException(error.message);
       Logger.error("Platform operation failed", error, "PlatformAPI");
       throw new ServiceUnavailableException("Platform service unavailable");
     }

@@ -8,7 +8,8 @@ The Shiplog and Planner isolated worktrees implement reduced read-only views
 at `/shiplog/workspaces/:workspace/releases` and
 `/planner/workspaces/:workspace/roadmap`. Internal edits and the other
 three adapters are still pending. Apply `sql/001-projections.sql` and
-`sql/002-planner-source.sql` to the isolated
+`sql/002-planner-source.sql`, `sql/003-planner-proposals.sql` and
+`sql/004-planner-markers.sql` to the isolated
 database using its local Compose `exec db psql` command; never apply it to the
 production database. Fresh imports apply these API SQL files automatically.
 The API's workspace directory only lists explicit app/workspace grants.
@@ -20,6 +21,31 @@ GitHub token secret to compile Planner's existing scheduler. The runtime image
 contains only the bundled scheduler, without browser translations/auth hooks
 or source duplication. Server scheduling uses its own English translation
 instance and returns only the reduced roadmap projection.
+
+Planner priority experiments now run entirely through the authenticated API:
+`POST /api/planner/workspaces/:workspace/preview` accepts `featureIds` and
+`expectedRevision`, recalculates the existing scheduler and never writes
+official features. `POST .../proposals` adds a `name` and saves a separate
+snapshot. `GET .../proposals` lists names/IDs/dates; `GET .../proposals/:id`
+returns only the reduced roadmap. Every operation requires explicit Planner
+workspace access, including external users; a Shiplog grant is insufficient.
+The API reuses the existing database priority/dependency validation, preserves
+the completed/in-progress prefix and rejects stale revisions.
+Snapshots are shared only within that workspace's authorized Planner audience.
+Technical scheduler inputs in snapshots remain unreadable to the API database
+role and are never serialized to the browser. No operation applies priorities
+to the official plan; manager editing remains pending. Legacy share-token
+snapshots remain in the imported legacy table until a reviewed migration is
+implemented; they are not automatically exposed through new workspace grants.
+
+Marker management is also API-backed. Internal Planner owner/editor/viewer
+grants can list `GET .../markers`; only owners/editors can create (`POST`),
+rename (`PATCH .../markers/:id`) or delete (`DELETE .../markers/:id`).
+Renaming changes only the name, preserving marker ID, workspace and date.
+External users see the reduced name/date projection in the roadmap, never the
+internal marker directory or edit controls. Writes are workspace-scoped,
+validate names and calendar dates, and update the official roadmap revision.
+Saved proposal snapshots remain unchanged when markers are edited.
 
 ## Local Docker
 

@@ -1,5 +1,6 @@
 import { Pool } from "pg";
 import type { AccessIdentity } from "./access.js";
+import type { PriorityInput, ProposalInput } from "./planner-input.js";
 
 export const APPLICATIONS = ["planner", "shiplog", "ladders", "pulse", "agents"] as const;
 export type Application = (typeof APPLICATIONS)[number];
@@ -14,6 +15,12 @@ export interface PlatformAccount {
   id: string;
   email: string;
   grants: { app: string; workspaceId: string; role: string }[];
+}
+
+export interface PriorityProposal {
+  id: string;
+  name: string;
+  created_at: string;
 }
 
 export class PlatformDatabase {
@@ -45,6 +52,73 @@ export class PlatformDatabase {
       [accountId, workspaceId]
     );
     return result.rows[0]!.source;
+  }
+
+  async plannerPreview(
+    accountId: string,
+    workspaceId: string,
+    input: PriorityInput
+  ): Promise<unknown> {
+    const result = await this.pool.query<{ source: unknown }>(
+      "SELECT platform.planner_preview($1,$2,$3,$4) AS source",
+      [accountId, workspaceId, input.featureIds, input.expectedRevision]
+    );
+    return result.rows[0]!.source;
+  }
+
+  async plannerProposals(accountId: string, workspaceId: string): Promise<PriorityProposal[]> {
+    const result = await this.pool.query<{ id: string; name: string; created_at: Date }>(
+      "SELECT id,name,created_at FROM platform.planner_proposals($1,$2)",
+      [accountId, workspaceId]
+    );
+    return result.rows.map((row) => ({ ...row, created_at: row.created_at.toISOString() }));
+  }
+
+  async plannerSavedProposal(
+    accountId: string,
+    workspaceId: string,
+    proposalId: string
+  ): Promise<unknown> {
+    const result = await this.pool.query<{ source: unknown }>(
+      "SELECT platform.planner_saved_proposal($1,$2,$3) AS source",
+      [accountId, workspaceId, proposalId]
+    );
+    return result.rows[0]!.source;
+  }
+
+  async plannerSaveProposal(
+    accountId: string,
+    workspaceId: string,
+    input: ProposalInput
+  ): Promise<string> {
+    const result = await this.pool.query<{ id: string }>(
+      "SELECT platform.planner_save_proposal($1,$2,$3,$4,$5) AS id",
+      [accountId, workspaceId, input.name, input.featureIds, input.expectedRevision]
+    );
+    return result.rows[0]!.id;
+  }
+
+  async plannerMarkers(accountId: string, workspaceId: string): Promise<unknown> {
+    const result = await this.pool.query<{ markers: unknown }>(
+      "SELECT platform.planner_markers($1,$2) AS markers",
+      [accountId, workspaceId]
+    );
+    return result.rows[0]!.markers;
+  }
+
+  async plannerMarker(
+    accountId: string,
+    workspaceId: string,
+    action: "create" | "rename" | "delete",
+    markerId: string | null,
+    name: string | null,
+    date: string | null
+  ): Promise<unknown> {
+    const result = await this.pool.query<{ marker: unknown }>(
+      "SELECT platform.planner_marker($1,$2,$3,$4,$5,$6) AS marker",
+      [accountId, workspaceId, action, markerId, name, date]
+    );
+    return result.rows[0]!.marker;
   }
 
   async account(identity: AccessIdentity): Promise<PlatformAccount> {

@@ -1,6 +1,12 @@
 import { Pool } from "pg";
 import type { AccessIdentity } from "./access.js";
-import type { PriorityInput, ProposalInput, FeatureInput } from "./planner-input.js";
+import type {
+  PriorityInput,
+  ProposalInput,
+  FeatureInput,
+  VacationInput,
+  CalibrationInput,
+} from "./planner-input.js";
 
 export const APPLICATIONS = ["planner", "shiplog", "ladders", "pulse", "agents"] as const;
 export type Application = (typeof APPLICATIONS)[number];
@@ -132,6 +138,39 @@ export class PlatformDatabase {
       [accountId, workspaceId]
     );
     return result.rows[0]!.features;
+  }
+
+  async plannerCalendar(accountId: string, workspaceId: string): Promise<unknown> {
+    const result = await this.pool.query<{ calendar: unknown }>(
+      "SELECT platform.planner_calendar($1,$2) AS calendar",
+      [accountId, workspaceId]
+    );
+    return result.rows[0]!.calendar;
+  }
+
+  async plannerVacations(
+    accountId: string,
+    workspaceId: string,
+    memberId: string,
+    input: VacationInput
+  ): Promise<unknown> {
+    const result = await this.pool.query<{ calendar: unknown }>(
+      "SELECT platform.planner_vacations($1,$2,$3,$4,$5,$6) AS calendar",
+      [accountId, workspaceId, memberId, input.start, input.end, input.working]
+    );
+    return result.rows[0]!.calendar;
+  }
+
+  async plannerCalibration(
+    accountId: string,
+    workspaceId: string,
+    input: CalibrationInput
+  ): Promise<unknown> {
+    const result = await this.pool.query<{ calendar: unknown }>(
+      "SELECT platform.planner_calibration($1,$2,$3,$4) AS calendar",
+      [accountId, workspaceId, input.anchor, JSON.stringify(input.history)]
+    );
+    return result.rows[0]!.calendar;
   }
 
   async plannerToggleBacklog(

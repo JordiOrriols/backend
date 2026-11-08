@@ -23,6 +23,59 @@ export interface FeatureInput {
   qa_devs: number;
   qa_weeks: number;
 }
+export interface VacationInput {
+  start: string;
+  end: string;
+  working: boolean;
+}
+export interface CalibrationInput {
+  anchor: string;
+  history: { start_date: string; story_points: number }[];
+}
+
+export function vacationInput(body: unknown): VacationInput {
+  if (
+    !body ||
+    typeof body !== "object" ||
+    !("start" in body) ||
+    !("end" in body) ||
+    !("working" in body) ||
+    typeof body.working !== "boolean"
+  )
+    throw new BadRequestException("Vacation range and working flag are required");
+  const start = dateInput({ date: body.start }),
+    end = dateInput({ date: body.end });
+  const days = (Date.parse(`${end}T00:00:00Z`) - Date.parse(`${start}T00:00:00Z`)) / 86400000;
+  if (days < 0 || days > 365)
+    throw new BadRequestException("Choose a date range of at most 366 days");
+  return { start, end, working: body.working };
+}
+
+export function calibrationInput(body: unknown): CalibrationInput {
+  if (
+    !body ||
+    typeof body !== "object" ||
+    !("anchor" in body) ||
+    !("history" in body) ||
+    !Array.isArray(body.history)
+  )
+    throw new BadRequestException("Calibration anchor and history are required");
+  const anchor = dateInput({ date: body.anchor });
+  const history = body.history.map((entry: unknown) => {
+    if (
+      !entry ||
+      typeof entry !== "object" ||
+      !("start_date" in entry) ||
+      !("story_points" in entry) ||
+      typeof entry.story_points !== "number" ||
+      !Number.isFinite(entry.story_points) ||
+      entry.story_points < 0
+    )
+      throw new BadRequestException("Each sprint requires a date and finite nonnegative points");
+    return { start_date: dateInput({ date: entry.start_date }), story_points: entry.story_points };
+  });
+  return { anchor, history };
+}
 
 export function featureInput(body: unknown): FeatureInput {
   if (!body || typeof body !== "object" || Array.isArray(body))

@@ -9,6 +9,8 @@ import {
   featureInput,
   inclusionInput,
   dateInput,
+  vacationInput,
+  calibrationInput,
 } from "../src/planner-input.js";
 
 const input = {
@@ -32,6 +34,45 @@ test("priority requests require a canonical revision and a unique UUID order", (
     { ...input, expectedRevision: "stale" },
   ])
     assert.throws(() => priorityInput(invalid));
+});
+test("vacation input enforces exact booleans and inclusive ranges of at most 366 days", () => {
+  const range = { start: "2026-01-01", end: "2027-01-01", working: false };
+  assert.deepEqual(vacationInput(range), range);
+  assert.deepEqual(vacationInput({ ...range, end: range.start, working: true }), {
+    ...range,
+    end: range.start,
+    working: true,
+  });
+  for (const invalid of [
+    null,
+    [],
+    {},
+    { ...range, working: "false" },
+    { ...range, end: "2027-01-02" },
+    { ...range, end: "2025-12-31" },
+    { ...range, start: "2026-02-30" },
+  ])
+    assert.throws(() => vacationInput(invalid));
+});
+test("calibration input validates shape and finite nonnegative points before domain validation", () => {
+  const calibration = {
+    anchor: "2026-02-02",
+    history: [{ start_date: "2026-02-02", story_points: 12.5 }],
+  };
+  assert.deepEqual(calibrationInput(calibration), calibration);
+  for (const invalid of [
+    null,
+    [],
+    {},
+    { ...calibration, history: null },
+    { ...calibration, anchor: "bad" },
+    ...[-1, NaN, Infinity, "1", null].map((story_points) => ({
+      ...calibration,
+      history: [{ start_date: "2026-02-02", story_points }],
+    })),
+    { ...calibration, history: [{ start_date: "2026-02-30", story_points: 1 }] },
+  ])
+    assert.throws(() => calibrationInput(invalid));
 });
 test("roadmap inclusion accepts only booleans and plan dates must be real calendar days", () => {
   assert.equal(inclusionInput({ included: true }), true);

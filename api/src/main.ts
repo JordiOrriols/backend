@@ -20,7 +20,7 @@ import {
 import { NestFactory } from "@nestjs/core";
 import { AccessVerifier } from "./access.js";
 import { APPLICATIONS, PlatformDatabase } from "./database.js";
-import { buildPublicRoadmap, hasHolidayCalendar } from "./scheduler.mjs";
+import { buildPublicRoadmap, hasHolidayCalendar, validateSprintSettings } from "./scheduler.mjs";
 import {
   priorityInput,
   proposalInput,
@@ -30,6 +30,8 @@ import {
   featureInput,
   inclusionInput,
   dateInput,
+  vacationInput,
+  calibrationInput,
 } from "./planner-input.js";
 
 function required(name: string): string {
@@ -43,6 +45,47 @@ const database = new PlatformDatabase(required("DATABASE_URL"));
 
 @Controller("api")
 class PlatformController {
+  @Get("planner/workspaces/:workspace/calendar")
+  async calendar(
+    @Headers("cf-access-jwt-assertion") token: string | undefined,
+    @Param("workspace", new ParseUUIDPipe()) workspace: string
+  ) {
+    return this.execute(token, (id) => database.plannerCalendar(id, workspace));
+  }
+
+  @Post("planner/workspaces/:workspace/members/:member/vacations")
+  async vacations(
+    @Headers("cf-access-jwt-assertion") token: string | undefined,
+    @Param("workspace", new ParseUUIDPipe()) workspace: string,
+    @Param("member", new ParseUUIDPipe()) member: string,
+    @Body() body: unknown
+  ) {
+    return this.execute(token, (id) => {
+      const input = vacationInput(body);
+      if (!hasHolidayCalendar(input.start) || !hasHolidayCalendar(input.end))
+        throw new BadRequestException("Vacations require verified working calendar dates");
+      return database.plannerVacations(id, workspace, member, input);
+    });
+  }
+
+  @Patch("planner/workspaces/:workspace/calibration")
+  async calibration(
+    @Headers("cf-access-jwt-assertion") token: string | undefined,
+    @Param("workspace", new ParseUUIDPipe()) workspace: string,
+    @Body() body: unknown
+  ) {
+    return this.execute(token, (id) => {
+      const input = calibrationInput(body);
+      try {
+        validateSprintSettings(input.anchor, input.history);
+      } catch (error) {
+        if (!(error instanceof Error)) throw error;
+        throw new BadRequestException(error.message);
+      }
+      return database.plannerCalibration(id, workspace, input);
+    });
+  }
+
   @Patch("planner/workspaces/:workspace/features/:feature/inclusion")
   async inclusion(
     @Headers("cf-access-jwt-assertion") token: string | undefined,

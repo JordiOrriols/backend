@@ -103,6 +103,26 @@ the existing Planner scheduler bundle instead of duplicating calendar years.
 It returns the recalculated reduced roadmap; task fields and proposal snapshots
 remain unchanged.
 
+Internal grants can read `GET .../calendar`: workspace teams, a minimal member
+roster, vacations and sprint settings. It excludes vacation/share tokens,
+account emails and evaluation records; external grants cannot read it.
+Owners/editors can save ranges using
+`POST .../members/:member/vacations` with `{start,end,working}`. Dates must be
+real, in the verified calendar and span at most 366 days inclusive.
+The member must belong to a team in that workspace. `working: true` removes
+nonworking vacation rows, restoring normal weekends/holidays without creating
+working overrides. There is no implicit self-edit or legacy member linking
+by email: edit permission comes from the workspace owner/editor grant.
+
+`PATCH .../calibration` accepts `{anchor,history}` for owners/editors.
+Structural validation precedes the actual Planner sprint validator exported
+in the scheduler bundle, preserving its calendar, alignment, uniqueness and
+nonnegative-point rules. Writes lock the grant/workspace and preserve proposal
+snapshots. The authenticated vacation route reuses the existing calendar,
+timeline, capacity forecast and calibration modal.
+Team creation/planning-role editing and reviewed member identity mapping are
+still pending; no anonymous member vacation links are active in this branch.
+
 Root `npm test` runs the legacy migration tests only. The separate API package
 uses Node's test runner via `npm --prefix api test`; CI installs and compiles
 that package independently. CI does not import backups or run remote tests.

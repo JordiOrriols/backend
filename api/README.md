@@ -13,7 +13,8 @@ pending. Apply `sql/001-projections.sql` and
 `sql/004-planner-markers.sql`, `sql/005-planner-priorities.sql` and
 `sql/006-planner-projects.sql`, `sql/007-planner-features.sql` and
 `sql/008-planner-roadmap-settings.sql`, `sql/009-planner-calendar.sql`,
-`sql/010-planner-teams.sql` and `sql/011-shiplog-applications.sql` to the isolated
+`sql/010-planner-teams.sql`, `sql/011-shiplog-applications.sql` and
+`sql/012-shiplog-releases.sql` to the isolated
 database using its local Compose `exec db psql` command; never apply it to the
 production database. Fresh imports apply these API SQL files automatically.
 The API's workspace directory only lists explicit app/workspace grants.
@@ -30,8 +31,24 @@ grant, workspace and existing application; updates preserve identity/timestamps.
 Audit events are stored separately under `platform.shiplog_audit_events`,
 with the verified platform account as actor. They never impersonate or link
 legacy accounts. The runtime cannot read/write that audit table directly.
-The existing application form/cards are reused; release editing, readiness,
-approvals and the audit history endpoint/view remain pending.
+The existing application form/cards are reused.
+
+Shiplog owners/editors create releases with `POST .../releases` and save
+configuration with `PATCH .../releases/:id`. The existing release form is shared
+with the legacy adapter. Version/type detection reuses the existing PostgreSQL
+SemVer implementation, excluding the edited release; application versions remain
+unique. Drafts allow version/title/feature editing; notes and manual status remain
+editable in every status, matching the existing independent QA/approval behavior.
+`feature_ids: null` preserves links, while an array replaces them atomically with
+the release fields and status. Link changes and `GET .../features` require an
+additional internal Planner grant in the same workspace. Cross-workspace features
+are rejected and existing linked names remain snapshots. Internal Shiplog users
+read linked IDs/names through `GET .../releases/:id/features`; external users retain
+only name-only catalog content. Writes lock grants/workspace/application/release
+and audit the verified platform actor. New releases leave the legacy `created_by`
+FK unset, rather than impersonating an old account, and retain the existing
+checklist snapshot trigger. Readiness/checklists, approvals and the audit history
+endpoint/view remain pending.
 
 The API Docker build uses the `planner` additional build context and a BuildKit
 GitHub token secret to compile Planner's existing scheduler. The runtime image

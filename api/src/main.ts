@@ -21,7 +21,7 @@ import { NestFactory } from "@nestjs/core";
 import { AccessVerifier } from "./access.js";
 import { APPLICATIONS, PlatformDatabase } from "./database.js";
 import { buildPublicRoadmap, hasHolidayCalendar, validateSprintSettings } from "./scheduler.mjs";
-import { applicationInput } from "./shiplog-input.js";
+import { applicationInput, releaseInput } from "./shiplog-input.js";
 import {
   priorityInput,
   proposalInput,
@@ -48,6 +48,42 @@ const database = new PlatformDatabase(required("DATABASE_URL"));
 
 @Controller("api")
 class PlatformController {
+  @Get("shiplog/workspaces/:workspace/features")
+  async shiplogFeatures(
+    @Headers("cf-access-jwt-assertion") token: string | undefined,
+    @Param("workspace", new ParseUUIDPipe()) workspace: string
+  ) {
+    return this.execute(token, (id) => database.shiplogWorkspaceFeatures(id, workspace));
+  }
+  @Get("shiplog/workspaces/:workspace/releases/:release/features")
+  async releaseFeatures(
+    @Headers("cf-access-jwt-assertion") token: string | undefined,
+    @Param("workspace", new ParseUUIDPipe()) workspace: string,
+    @Param("release", new ParseUUIDPipe()) release: string
+  ) {
+    return this.execute(token, (id) => database.shiplogReleaseFeatures(id, workspace, release));
+  }
+  @Post("shiplog/workspaces/:workspace/releases")
+  async createRelease(
+    @Headers("cf-access-jwt-assertion") token: string | undefined,
+    @Param("workspace", new ParseUUIDPipe()) workspace: string,
+    @Body() body: unknown
+  ) {
+    return this.execute(token, (id) =>
+      database.shiplogSaveRelease(id, workspace, releaseInput(body), null)
+    );
+  }
+  @Patch("shiplog/workspaces/:workspace/releases/:release")
+  async updateRelease(
+    @Headers("cf-access-jwt-assertion") token: string | undefined,
+    @Param("workspace", new ParseUUIDPipe()) workspace: string,
+    @Param("release", new ParseUUIDPipe()) release: string,
+    @Body() body: unknown
+  ) {
+    return this.execute(token, (id) =>
+      database.shiplogSaveRelease(id, workspace, releaseInput(body), release)
+    );
+  }
   @Get("shiplog/workspaces/:workspace/applications")
   async applications(
     @Headers("cf-access-jwt-assertion") token: string | undefined,

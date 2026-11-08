@@ -1,6 +1,6 @@
 import { Pool } from "pg";
 import type { AccessIdentity } from "./access.js";
-import type { ApplicationInput } from "./shiplog-input.js";
+import type { ApplicationInput, ReleaseInput } from "./shiplog-input.js";
 import type {
   PriorityInput,
   ProposalInput,
@@ -32,6 +32,37 @@ export interface PriorityProposal {
 }
 
 export class PlatformDatabase {
+  async shiplogReleaseFeatures(
+    account: string,
+    workspace: string,
+    release: string
+  ): Promise<unknown> {
+    const result = await this.pool.query<{ features: unknown }>(
+      "SELECT platform.shiplog_release_features($1,$2,$3) AS features",
+      [account, workspace, release]
+    );
+    return result.rows[0]!.features;
+  }
+  async shiplogWorkspaceFeatures(account: string, workspace: string): Promise<unknown> {
+    const result = await this.pool.query<{ features: unknown }>(
+      "SELECT platform.shiplog_workspace_features($1,$2) AS features",
+      [account, workspace]
+    );
+    return result.rows[0]!.features;
+  }
+  async shiplogSaveRelease(
+    account: string,
+    workspace: string,
+    input: ReleaseInput,
+    release: string | null
+  ): Promise<unknown> {
+    const { feature_ids, ...fields } = input;
+    const result = await this.pool.query<{ release: unknown }>(
+      "SELECT platform.shiplog_save_release($1,$2,$3,$4,$5) AS release",
+      [account, workspace, release, fields, feature_ids]
+    );
+    return result.rows[0]!.release;
+  }
   async shiplogApplications(account: string, workspace: string): Promise<unknown> {
     const result = await this.pool.query<{ directory: unknown }>(
       "SELECT platform.shiplog_applications($1,$2) AS directory",

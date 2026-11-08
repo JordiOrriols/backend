@@ -134,6 +134,27 @@ export class PlatformDatabase {
     return result.rows[0]!.features;
   }
 
+  async plannerToggleBacklog(
+    accountId: string,
+    workspaceId: string,
+    featureId: string,
+    included: boolean
+  ): Promise<unknown> {
+    const result = await this.pool.query<{ feature: unknown }>(
+      "SELECT platform.planner_toggle_backlog($1,$2,$3,$4) AS feature",
+      [accountId, workspaceId, featureId, included]
+    );
+    return result.rows[0]!.feature;
+  }
+
+  async plannerStartDate(accountId: string, workspaceId: string, date: string): Promise<unknown> {
+    const result = await this.pool.query<{ source: unknown }>(
+      "SELECT platform.planner_start_date($1,$2,$3) AS source",
+      [accountId, workspaceId, date]
+    );
+    return result.rows[0]!.source;
+  }
+
   async plannerFeature(
     accountId: string,
     workspaceId: string,

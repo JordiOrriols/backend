@@ -7,6 +7,8 @@ import {
   markerNameInput,
   projectNameInput,
   featureInput,
+  inclusionInput,
+  dateInput,
 } from "../src/planner-input.js";
 
 const input = {
@@ -30,6 +32,15 @@ test("priority requests require a canonical revision and a unique UUID order", (
     { ...input, expectedRevision: "stale" },
   ])
     assert.throws(() => priorityInput(invalid));
+});
+test("roadmap inclusion accepts only booleans and plan dates must be real calendar days", () => {
+  assert.equal(inclusionInput({ included: true }), true);
+  assert.equal(inclusionInput({ included: false }), false);
+  for (const included of [undefined, null, "true", 0, 1])
+    assert.throws(() => inclusionInput({ included }));
+  assert.equal(dateInput({ date: "2026-02-02" }), "2026-02-02");
+  for (const date of [undefined, null, "", "2026-02-30", "2026-2-2"])
+    assert.throws(() => dateInput({ date }));
 });
 
 const feature = {

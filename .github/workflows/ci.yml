@@ -43,6 +43,18 @@ jobs:
       - name: Test migrations
         run: npm test
 
+      - name: Install API dependencies
+        run: npm ci
+        working-directory: api
+
+      - name: Compile API
+        run: npm run build
+        working-directory: api
+
+      - name: Test API identity and input validation
+        run: npm test
+        working-directory: api
+
   database:
     runs-on: ubuntu-latest
     steps:

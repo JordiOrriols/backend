@@ -131,6 +131,21 @@ function namedInput(body: unknown, label: "Marker" | "Project"): string {
 
 export function markerInput(body: unknown): { name: string; date: string } {
   const name = markerNameInput(body);
+  return { name, date: dateInput(body) };
+}
+
+export function inclusionInput(body: unknown): boolean {
+  if (
+    !body ||
+    typeof body !== "object" ||
+    !("included" in body) ||
+    typeof body.included !== "boolean"
+  )
+    throw new BadRequestException("Roadmap inclusion must be a boolean");
+  return body.included;
+}
+
+export function dateInput(body: unknown): string {
   if (
     !body ||
     typeof body !== "object" ||
@@ -138,9 +153,9 @@ export function markerInput(body: unknown): { name: string; date: string } {
     typeof body.date !== "string" ||
     !/^(?!0000)\d{4}-\d{2}-\d{2}$/.test(body.date)
   )
-    throw new BadRequestException("A valid marker date is required");
+    throw new BadRequestException("A valid calendar date is required");
   const parsed = new Date(`${body.date}T00:00:00Z`);
   if (!Number.isFinite(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== body.date)
-    throw new BadRequestException("A valid marker date is required");
-  return { name, date: body.date };
+    throw new BadRequestException("A valid calendar date is required");
+  return body.date;
 }

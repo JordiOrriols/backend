@@ -20,7 +20,7 @@ import {
 import { NestFactory } from "@nestjs/core";
 import { AccessVerifier } from "./access.js";
 import { APPLICATIONS, PlatformDatabase } from "./database.js";
-import { buildPublicRoadmap } from "./scheduler.mjs";
+import { buildPublicRoadmap, hasHolidayCalendar } from "./scheduler.mjs";
 import {
   priorityInput,
   proposalInput,
@@ -28,6 +28,8 @@ import {
   markerNameInput,
   projectNameInput,
   featureInput,
+  inclusionInput,
+  dateInput,
 } from "./planner-input.js";
 
 function required(name: string): string {
@@ -41,6 +43,32 @@ const database = new PlatformDatabase(required("DATABASE_URL"));
 
 @Controller("api")
 class PlatformController {
+  @Patch("planner/workspaces/:workspace/features/:feature/inclusion")
+  async inclusion(
+    @Headers("cf-access-jwt-assertion") token: string | undefined,
+    @Param("workspace", new ParseUUIDPipe()) workspace: string,
+    @Param("feature", new ParseUUIDPipe()) feature: string,
+    @Body() body: unknown
+  ) {
+    return this.execute(token, (id) =>
+      database.plannerToggleBacklog(id, workspace, feature, inclusionInput(body))
+    );
+  }
+
+  @Patch("planner/workspaces/:workspace/start-date")
+  async startDate(
+    @Headers("cf-access-jwt-assertion") token: string | undefined,
+    @Param("workspace", new ParseUUIDPipe()) workspace: string,
+    @Body() body: unknown
+  ) {
+    return this.execute(token, async (id) => {
+      const date = dateInput(body);
+      if (!hasHolidayCalendar(date))
+        throw new BadRequestException("Plan start requires a verified working calendar year");
+      return buildPublicRoadmap(await database.plannerStartDate(id, workspace, date));
+    });
+  }
+
   @Get("planner/workspaces/:workspace/features")
   async features(
     @Headers("cf-access-jwt-assertion") token: string | undefined,

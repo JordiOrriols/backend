@@ -11,7 +11,8 @@ described below. Other internal edits and the other three adapters are still
 pending. Apply `sql/001-projections.sql` and
 `sql/002-planner-source.sql`, `sql/003-planner-proposals.sql` and
 `sql/004-planner-markers.sql`, `sql/005-planner-priorities.sql` and
-`sql/006-planner-projects.sql` and `sql/007-planner-features.sql` to the isolated
+`sql/006-planner-projects.sql`, `sql/007-planner-features.sql` and
+`sql/008-planner-roadmap-settings.sql` to the isolated
 database using its local Compose `exec db psql` command; never apply it to the
 production database. Fresh imports apply these API SQL files automatically.
 The API's workspace directory only lists explicit app/workspace grants.
@@ -63,7 +64,7 @@ orders from the same revision cannot both succeed. The response is the newly
 scheduled reduced official roadmap, not raw scheduler inputs.
 External/viewer users, wrong-app/workspace grants and revoked accounts cannot
 perform this operation. The runtime role still cannot directly update features.
-Roadmap inclusion/removal, planning settings and vacation editing remain pending.
+Vacation editing and capacity/planning configuration remain pending.
 
 Project management reuses the existing Planner modal. Internal grants can list
 `GET .../projects`; owners/editors can create (`POST`), rename
@@ -90,6 +91,21 @@ dependency ordering, and deleting a prerequisite are rejected atomically.
 Only explicitly projected task fields are returned; the API role still cannot
 read or write the legacy feature table directly. Task edits refresh the current
 roadmap, while saved proposal snapshots are untouched.
+
+Roadmap inclusion/removal uses `PATCH .../features/:id/inclusion` with an exact
+boolean `included`. Only owners/editors can write. Inclusion appends to the
+current roadmap under the workspace lock; repeat inclusion preserves priority.
+Existing dependency validation rejects adding a dependant before its
+prerequisite or removing a prerequisite while its dependant remains included.
+Changing `PATCH .../start-date` with `date` also requires owner/editor access.
+The API validates real dates and imports the verified-calendar predicate from
+the existing Planner scheduler bundle instead of duplicating calendar years.
+It returns the recalculated reduced roadmap; task fields and proposal snapshots
+remain unchanged.
+
+Root `npm test` runs the legacy migration tests only. The separate API package
+uses Node's test runner via `npm --prefix api test`; CI installs and compiles
+that package independently. CI does not import backups or run remote tests.
 
 ## Local Docker
 

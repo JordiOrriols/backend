@@ -1,0 +1,75 @@
+name: digital-platform-local
+services:
+  db:
+    image: postgres:17-bookworm
+    environment:
+      POSTGRES_DB: platform
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${LOCAL_DB_PASSWORD:?Set a local database password}
+    volumes:
+      - database:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d platform"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+    networks: [database]
+  import:
+    profiles: [tools]
+    build:
+      context: .
+      target: build
+    environment:
+      DATABASE_URL: postgres://postgres:${LOCAL_DB_PASSWORD}@db:5432/platform
+      LOCAL_IMPORT_CONFIRM: local-only
+      API_DATABASE_PASSWORD: ${LOCAL_API_DB_PASSWORD:?Set a local API password}
+    volumes:
+      - ${LOCAL_BACKUP_DIR:?Set the verified local backup directory}:/backup:ro
+      - ../supabase/migrations:/migrations:ro
+      - ./sql:/platform-schema:ro
+      - ./scripts:/app/scripts:ro
+    command: ["npm", "run", "db:import"]
+    depends_on:
+      db: { condition: service_healthy }
+    networks: [database]
+  api:
+    build: .
+    environment:
+      DATABASE_URL: postgres://platform_api:${LOCAL_API_DB_PASSWORD}@db:5432/platform
+      ACCESS_ISSUER: ${ACCESS_ISSUER:?Set Cloudflare Access issuer}
+      ACCESS_AUDIENCE: ${ACCESS_AUDIENCE:?Set Cloudflare Access application audience}
+    ports: ["127.0.0.1:5300:3000"]
+    depends_on:
+      db: { condition: service_healthy }
+    networks: [database, edge]
+  integration:
+    profiles: [tools]
+    build:
+      context: .
+      target: build
+    environment:
+      DATABASE_URL: postgres://postgres:${LOCAL_DB_PASSWORD}@db:5432/platform
+      API_DATABASE_URL: postgres://platform_api:${LOCAL_API_DB_PASSWORD}@db:5432/platform
+    volumes:
+      - ./test:/app/test:ro
+    command: ["npm", "run", "test:integration"]
+    depends_on:
+      db: { condition: service_healthy }
+    networks: [database]
+  shiplog:
+    profiles: [web]
+    build:
+      context: ../../shiplog-access-local
+      secrets: [github_token]
+    ports: ["127.0.0.1:5310:80"]
+    depends_on: [api]
+    networks: [edge]
+secrets:
+  github_token:
+    environment: GITHUB_TOKEN
+networks:
+  database:
+    internal: true
+  edge:
+volumes:
+  database:

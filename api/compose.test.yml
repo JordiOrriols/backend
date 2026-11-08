@@ -10,6 +10,9 @@ services:
     build:
       context: .
       target: build
+      additional_contexts:
+        planner: ../../planner-access-local
+      secrets: [github_token]
     environment:
       NODE_ENV: development
     volumes:

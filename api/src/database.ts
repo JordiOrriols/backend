@@ -39,6 +39,14 @@ export class PlatformDatabase {
     return result.rows[0]!.catalog;
   }
 
+  async plannerSource(accountId: string, workspaceId: string): Promise<unknown> {
+    const result = await this.pool.query<{ source: unknown }>(
+      "SELECT platform.planner_source($1,$2) AS source",
+      [accountId, workspaceId]
+    );
+    return result.rows[0]!.source;
+  }
+
   async account(identity: AccessIdentity): Promise<PlatformAccount> {
     const client = await this.pool.connect();
     try {

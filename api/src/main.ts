@@ -14,6 +14,7 @@ import {
 import { NestFactory } from "@nestjs/core";
 import { AccessVerifier } from "./access.js";
 import { APPLICATIONS, PlatformDatabase } from "./database.js";
+import { buildPublicRoadmap } from "./scheduler.mjs";
 
 function required(name: string): string {
   const value = process.env[name];
@@ -26,6 +27,16 @@ const database = new PlatformDatabase(required("DATABASE_URL"));
 
 @Controller("api")
 class PlatformController {
+  @Get("planner/workspaces/:workspace/roadmap")
+  async roadmap(
+    @Headers("cf-access-jwt-assertion") token: string | undefined,
+    @Param("workspace", new ParseUUIDPipe()) workspace: string
+  ) {
+    return this.execute(token, async (id) =>
+      buildPublicRoadmap(await database.plannerSource(id, workspace))
+    );
+  }
+
   private async execute<T>(token: string | undefined, operation: (id: string) => Promise<T>) {
     const identity = await verifier.verify(token);
     try {

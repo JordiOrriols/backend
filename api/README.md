@@ -2,16 +2,24 @@
 
 This isolated branch adds a NestJS/TypeScript API and plain PostgreSQL 17.
 It does not modify production workflows or publish packages.
-Most application adapters and internal editing workflows are not migrated yet.
+Internal editing workflows and three application adapters are not migrated yet.
 
-The Shiplog isolated worktree now implements its read-only catalog via browser
-paths at `/shiplog/workspaces/:workspace/releases`. Internal edits and the other
-four adapters are still pending. Apply `sql/001-projections.sql` to the isolated
+The Shiplog and Planner isolated worktrees implement reduced read-only views
+at `/shiplog/workspaces/:workspace/releases` and
+`/planner/workspaces/:workspace/roadmap`. Internal edits and the other
+three adapters are still pending. Apply `sql/001-projections.sql` and
+`sql/002-planner-source.sql` to the isolated
 database using its local Compose `exec db psql` command; never apply it to the
 production database. Fresh imports apply these API SQL files automatically.
 The API's workspace directory only lists explicit app/workspace grants.
 Catalog responses reuse the existing reduced release projection, without
 private engineering notes, audit entries or token settings.
+
+The API Docker build uses the `planner` additional build context and a BuildKit
+GitHub token secret to compile Planner's existing scheduler. The runtime image
+contains only the bundled scheduler, without browser translations/auth hooks
+or source duplication. Server scheduling uses its own English translation
+instance and returns only the reduced roadmap projection.
 
 ## Local Docker
 
@@ -96,7 +104,19 @@ docker compose --env-file .env -f compose.local.yml -f compose.test.yml up -d --
 
 Run `PLATFORM_DOCKER_WEB=1 npx playwright test --config=platform-local.config.ts`
 from the isolated E2E worktree. That test uses the loopback web container at
-`http://127.0.0.1:5310/shiplog/`, rejects nonlocal browser requests and checks
+`http://127.0.0.1:5320/`, rejects nonlocal browser requests and checks
 deep-route reloads, missing authentication and permission revocation.
 Stop the `access-fixture` service after the checks and recreate `api` with only
 `compose.local.yml` to restore real Access issuer/audience verification.
+
+The gateway provides the single-origin layout for both apps. To start the
+complete local test stack, explicitly include the test override in every
+Compose command (omitting it resets the API to normal Access configuration):
+
+```sh
+docker compose --env-file .env -f compose.local.yml -f compose.test.yml --profile web up -d --build api planner shiplog gateway access-fixture
+```
+
+After recreating the API container, restart the local Nginx web/gateway services
+so their upstream hostname resolutions point to the new container.
+Do not use the local signed-token fixture in any external environment.

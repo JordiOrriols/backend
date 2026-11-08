@@ -2,14 +2,16 @@
 
 This isolated branch adds a NestJS/TypeScript API and plain PostgreSQL 17.
 It does not modify production workflows or publish packages.
-Internal editing workflows and three application adapters are not migrated yet.
+Most internal editing workflows and three application adapters are not migrated yet.
 
-The Shiplog and Planner isolated worktrees implement reduced read-only views
+The Shiplog and Planner isolated worktrees implement reduced views
 at `/shiplog/workspaces/:workspace/releases` and
-`/planner/workspaces/:workspace/roadmap`. Internal edits and the other
-three adapters are still pending. Apply `sql/001-projections.sql` and
+`/planner/workspaces/:workspace/roadmap`, with the Planner editing operations
+described below. Other internal edits and the other three adapters are still
+pending. Apply `sql/001-projections.sql` and
 `sql/002-planner-source.sql`, `sql/003-planner-proposals.sql` and
-`sql/004-planner-markers.sql` to the isolated
+`sql/004-planner-markers.sql`, `sql/005-planner-priorities.sql` and
+`sql/006-planner-projects.sql` to the isolated
 database using its local Compose `exec db psql` command; never apply it to the
 production database. Fresh imports apply these API SQL files automatically.
 The API's workspace directory only lists explicit app/workspace grants.
@@ -33,8 +35,8 @@ The API reuses the existing database priority/dependency validation, preserves
 the completed/in-progress prefix and rejects stale revisions.
 Snapshots are shared only within that workspace's authorized Planner audience.
 Technical scheduler inputs in snapshots remain unreadable to the API database
-role and are never serialized to the browser. No operation applies priorities
-to the official plan; manager editing remains pending. Legacy share-token
+role and are never serialized to the browser. Previewing and saving never apply
+priorities to the official plan. Legacy share-token
 snapshots remain in the imported legacy table until a reviewed migration is
 implemented; they are not automatically exposed through new workspace grants.
 
@@ -46,6 +48,32 @@ External users see the reduced name/date projection in the roadmap, never the
 internal marker directory or edit controls. Writes are workspace-scoped,
 validate names and calendar dates, and update the official roadmap revision.
 Saved proposal snapshots remain unchanged when markers are edited.
+
+Owners/editors can explicitly apply a reviewed experiment using
+`POST /api/planner/workspaces/:workspace/priorities` with `featureIds` and
+`expectedRevision`. The frontend requires a separate confirmation. To apply a
+saved proposal, first try its priorities on the current plan: saved dates and
+revisions are not copied into the official plan.
+The write holds the matching grant and workspace locks, reuses the existing
+preview/dependency checks, and updates only roadmap features' priorities.
+Completed/in-progress work and its prefix stay locked. Backlog features,
+estimates, names, statuses, vacations, markers and saved snapshots are unchanged.
+Stale or invalid requests fail without partial writes; concurrent differing
+orders from the same revision cannot both succeed. The response is the newly
+scheduled reduced official roadmap, not raw scheduler inputs.
+External/viewer users, wrong-app/workspace grants and revoked accounts cannot
+perform this operation. The runtime role still cannot directly update features.
+Task CRUD, estimates and vacation editing remain pending.
+
+Project management reuses the existing Planner modal. Internal grants can list
+`GET .../projects`; owners/editors can create (`POST`), rename
+(`PATCH .../projects/:id`) and delete (`DELETE .../projects/:id`).
+The directory returns only ID, workspace, name and an `in_use` flag. Names are
+trimmed and validated to 1-80 characters. All writes are workspace-scoped and
+hold the workspace lock. Deleting a project containing any feature, including
+off-roadmap backlog tasks, returns 409 without deleting anything. The modal
+disables that delete action. Wrong-workspace/missing IDs return 404; external
+users cannot read this directory. Renaming preserves ID and feature membership.
 
 ## Local Docker
 
@@ -119,8 +147,8 @@ Apps: `planner`, `shiplog`, `ladders`, `pulse`, `agents`.
 Roles: `owner`, `editor`, `viewer`, `external` (last only for Planner/Shiplog).
 Granting an existing app/workspace replaces its role; revocation affects only
 the specified account/app/workspace. Missing accounts, workspaces and grants
-fail explicitly. Changing a role does not yet unlock internal editing: those
-workflows remain unported.
+fail explicitly. Owner/editor grants unlock only the Planner editing operations
+described above; other internal workflows remain unported.
 
 Only this separate local tools container uses the administrator connection.
 The HTTP API role still cannot assign or revoke grants, and no administrator

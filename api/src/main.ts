@@ -21,7 +21,13 @@ import { NestFactory } from "@nestjs/core";
 import { AccessVerifier } from "./access.js";
 import { APPLICATIONS, PlatformDatabase } from "./database.js";
 import { buildPublicRoadmap } from "./scheduler.mjs";
-import { priorityInput, proposalInput, markerInput, markerNameInput } from "./planner-input.js";
+import {
+  priorityInput,
+  proposalInput,
+  markerInput,
+  markerNameInput,
+  projectNameInput,
+} from "./planner-input.js";
 
 function required(name: string): string {
   const value = process.env[name];
@@ -34,6 +40,59 @@ const database = new PlatformDatabase(required("DATABASE_URL"));
 
 @Controller("api")
 class PlatformController {
+  @Get("planner/workspaces/:workspace/projects")
+  async projects(
+    @Headers("cf-access-jwt-assertion") token: string | undefined,
+    @Param("workspace", new ParseUUIDPipe()) workspace: string
+  ) {
+    return this.execute(token, (id) => database.plannerProjects(id, workspace));
+  }
+
+  @Post("planner/workspaces/:workspace/projects")
+  async createProject(
+    @Headers("cf-access-jwt-assertion") token: string | undefined,
+    @Param("workspace", new ParseUUIDPipe()) workspace: string,
+    @Body() body: unknown
+  ) {
+    return this.execute(token, (id) =>
+      database.plannerProject(id, workspace, "create", null, projectNameInput(body))
+    );
+  }
+
+  @Patch("planner/workspaces/:workspace/projects/:project")
+  async renameProject(
+    @Headers("cf-access-jwt-assertion") token: string | undefined,
+    @Param("workspace", new ParseUUIDPipe()) workspace: string,
+    @Param("project", new ParseUUIDPipe()) project: string,
+    @Body() body: unknown
+  ) {
+    return this.execute(token, (id) =>
+      database.plannerProject(id, workspace, "rename", project, projectNameInput(body))
+    );
+  }
+
+  @Delete("planner/workspaces/:workspace/projects/:project")
+  async deleteProject(
+    @Headers("cf-access-jwt-assertion") token: string | undefined,
+    @Param("workspace", new ParseUUIDPipe()) workspace: string,
+    @Param("project", new ParseUUIDPipe()) project: string
+  ) {
+    return this.execute(token, (id) =>
+      database.plannerProject(id, workspace, "delete", project, null)
+    );
+  }
+
+  @Post("planner/workspaces/:workspace/priorities")
+  async applyPriorities(
+    @Headers("cf-access-jwt-assertion") token: string | undefined,
+    @Param("workspace", new ParseUUIDPipe()) workspace: string,
+    @Body() body: unknown
+  ) {
+    return this.execute(token, async (id) =>
+      buildPublicRoadmap(await database.plannerApplyPriorities(id, workspace, priorityInput(body)))
+    );
+  }
+
   @Get("planner/workspaces/:workspace/markers")
   async markers(
     @Headers("cf-access-jwt-assertion") token: string | undefined,

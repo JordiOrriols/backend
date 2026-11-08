@@ -38,11 +38,19 @@ export function proposalInput(body: unknown): ProposalInput {
 }
 
 export function markerNameInput(body: unknown): string {
+  return namedInput(body, "Marker");
+}
+
+export function projectNameInput(body: unknown): string {
+  return namedInput(body, "Project");
+}
+
+function namedInput(body: unknown, label: "Marker" | "Project"): string {
   if (!body || typeof body !== "object" || !("name" in body) || typeof body.name !== "string")
-    throw new BadRequestException("Marker name is required");
+    throw new BadRequestException(`${label} name is required`);
   const name = body.name.trim();
   if (Array.from(name).length < 1 || Array.from(name).length > 80)
-    throw new BadRequestException("Marker names need between 1 and 80 characters");
+    throw new BadRequestException(`${label} names need between 1 and 80 characters`);
   return name;
 }
 

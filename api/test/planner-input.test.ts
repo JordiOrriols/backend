@@ -5,6 +5,7 @@ import {
   proposalInput,
   markerInput,
   markerNameInput,
+  projectNameInput,
 } from "../src/planner-input.js";
 
 const input = {
@@ -46,4 +47,10 @@ test("markers validate names and real calendar dates without accepting normalize
     assert.deepEqual(markerInput({ name: "Launch", date }), { name: "Launch", date });
   for (const date of [null, "", "2026-02-30", "2026-02-29", "0000-01-01", "2026-13-01", "2026-2-2"])
     assert.throws(() => markerInput({ name: "Launch", date }));
+});
+test("project names reuse the same trimmed 1-80 character validation", () => {
+  assert.equal(projectNameInput({ name: " Project " }), "Project");
+  assert.equal(projectNameInput({ name: "p".repeat(80) }).length, 80);
+  for (const name of ["", " ", "p".repeat(81), null])
+    assert.throws(() => projectNameInput({ name }));
 });

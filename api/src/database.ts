@@ -66,6 +66,18 @@ export class PlatformDatabase {
     return result.rows[0]!.source;
   }
 
+  async plannerApplyPriorities(
+    accountId: string,
+    workspaceId: string,
+    input: PriorityInput
+  ): Promise<unknown> {
+    const result = await this.pool.query<{ source: unknown }>(
+      "SELECT platform.planner_apply_priorities($1,$2,$3,$4) AS source",
+      [accountId, workspaceId, input.featureIds, input.expectedRevision]
+    );
+    return result.rows[0]!.source;
+  }
+
   async plannerProposals(accountId: string, workspaceId: string): Promise<PriorityProposal[]> {
     const result = await this.pool.query<{ id: string; name: string; created_at: Date }>(
       "SELECT id,name,created_at FROM platform.planner_proposals($1,$2)",
@@ -104,6 +116,28 @@ export class PlatformDatabase {
       [accountId, workspaceId]
     );
     return result.rows[0]!.markers;
+  }
+
+  async plannerProjects(accountId: string, workspaceId: string): Promise<unknown> {
+    const result = await this.pool.query<{ projects: unknown }>(
+      "SELECT platform.planner_projects($1,$2) AS projects",
+      [accountId, workspaceId]
+    );
+    return result.rows[0]!.projects;
+  }
+
+  async plannerProject(
+    accountId: string,
+    workspaceId: string,
+    action: "create" | "rename" | "delete",
+    projectId: string | null,
+    name: string | null
+  ): Promise<unknown> {
+    const result = await this.pool.query<{ project: unknown }>(
+      "SELECT platform.planner_project($1,$2,$3,$4,$5) AS project",
+      [accountId, workspaceId, action, projectId, name]
+    );
+    return result.rows[0]!.project;
   }
 
   async plannerMarker(

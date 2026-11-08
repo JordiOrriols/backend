@@ -21,6 +21,7 @@ import {
 import { NestFactory } from "@nestjs/core";
 import { AccessVerifier } from "./access.js";
 import { APPLICATIONS, PlatformDatabase } from "./database.js";
+import { memberProfileInput } from "./ladders-input.js";
 import { buildPublicRoadmap, hasHolidayCalendar, validateSprintSettings } from "./scheduler.mjs";
 import {
   applicationInput,
@@ -56,6 +57,17 @@ const database = new PlatformDatabase(required("DATABASE_URL"));
 
 @Controller("api")
 class PlatformController {
+  @Patch("ladders/workspaces/:workspace/members/:member")
+  async laddersSaveProfile(
+    @Headers("cf-access-jwt-assertion") token: string | undefined,
+    @Param("workspace", new ParseUUIDPipe()) workspace: string,
+    @Param("member", new ParseUUIDPipe()) member: string,
+    @Body() body: unknown
+  ) {
+    return this.execute(token, (id) =>
+      database.laddersSaveProfile(id, workspace, member, memberProfileInput(body))
+    );
+  }
   @Get("ladders/workspaces/:workspace/teams")
   async laddersTeams(
     @Headers("cf-access-jwt-assertion") token: string | undefined,

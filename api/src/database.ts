@@ -1,5 +1,6 @@
 import { Pool } from "pg";
 import type { AccessIdentity } from "./access.js";
+import type { MemberProfileInput } from "./ladders-input.js";
 import type { ApplicationInput, ReleaseInput, ChecklistInput } from "./shiplog-input.js";
 import type {
   PriorityInput,
@@ -32,6 +33,18 @@ export interface PriorityProposal {
 }
 
 export class PlatformDatabase {
+  async laddersSaveProfile(
+    account: string,
+    workspace: string,
+    member: string,
+    profile: MemberProfileInput
+  ): Promise<unknown> {
+    const result = await this.pool.query<{ data: unknown }>(
+      "SELECT platform.ladders_save_profile($1,$2,$3,$4) AS data",
+      [account, workspace, member, profile]
+    );
+    return result.rows[0]!.data;
+  }
   async laddersTeams(account: string, workspace: string): Promise<unknown> {
     const result = await this.pool.query<{ data: unknown }>(
       "SELECT platform.ladders_teams($1,$2) AS data",

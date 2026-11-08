@@ -17,7 +17,7 @@ team/member directory with team creation/renaming. Apply `sql/001-projections.sq
 `sql/010-planner-teams.sql`, `sql/011-shiplog-applications.sql` and
 `sql/012-shiplog-releases.sql`, `sql/013-shiplog-checklists.sql` and
 `sql/014-shiplog-decisions.sql`, `sql/015-shiplog-audit.sql` and
-`sql/016-ladders-teams.sql` to the isolated
+`sql/016-ladders-teams.sql` and `sql/017-ladders-profiles.sql` to the isolated
 database using its local Compose `exec db psql` command; never apply it to the
 production database. Fresh imports apply these API SQL files automatically.
 The API's workspace directory only lists explicit app/workspace grants.
@@ -26,7 +26,7 @@ private engineering notes, audit entries or token settings.
 
 Ladders internal grants read `GET /api/ladders/workspaces/:workspace/teams`.
 The response contains team IDs/names and member IDs/team IDs/names/roles/planning
-roles, never legacy owner/account IDs, personal tokens, evaluations or comments.
+roles/template IDs, never legacy owner/account IDs, personal tokens, evaluations or comments.
 Only owners create with `POST .../teams`; owners/editors rename with
 `PATCH .../teams/:team`. Shared name validation enforces 1-120 trimmed characters.
 Writes lock the explicit Ladders grant and workspace and reject foreign team IDs.
@@ -35,8 +35,22 @@ Planner grants do not confer Ladders access; same-email subjects remain distinct
 The isolated Ladders worktree serves authenticated hash-free `/ladders/` routes
 through the local gateway on port 5320 (direct app port 5314). It reuses UI layout,
 language/footer and team-name dialogs without initializing old browser Supabase
-or password/anonymous flows. Evaluations, member writes, goals, deletion and
+or password/anonymous flows. Evaluations, member creation/moves, goals, deletion and
 shared lifecycle remain pending; the draft is not a production replacement.
+
+Owners/editors update member profiles with
+`PATCH /api/ladders/workspaces/:workspace/members/:member`, supplying explicit
+`name`, `role`, `planning_role` and `template_id` fields. The API whitelists fields
+and reuses the shared planning-role validator. Names/job roles are bounded to
+120 Unicode characters; legacy template IDs retain the existing 10-character
+limit and nullable roles/templates can be cleared. Grant/workspace/member locks
+serialize writes, and cross-workspace/missing members return 404. Existing member
+integrity triggers remain intact: ownership, team, tokens, account links and
+creation times are never mutated, nor is evaluation history. No legacy login is
+simulated to authorize these writes. Viewer/revoked/other-app grants cannot edit.
+The UI reuses the assessment's extracted profile fields and existing planning-role/
+template controls. Updated planning roles feed Planner's shared roster while
+requiring a separate Planner grant to inspect that roster.
 
 Internal Shiplog grants can read `GET .../applications`, returning explicit
 application fields, an `in_use` flag and workspace team IDs/names. External

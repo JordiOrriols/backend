@@ -62,7 +62,14 @@ test("Ladders directory and team writes are explicit-grant scoped without legacy
     assert.deepEqual(await api.laddersTeams(account.id, workspace), {
       teams: [{ id: team, name: "Core" }],
       members: [
-        { id: member, team_id: team, name: "Local member", role: "Developer", planning_role: null },
+        {
+          id: member,
+          team_id: team,
+          name: "Local member",
+          role: "Developer",
+          planning_role: null,
+          template_id: null,
+        },
       ],
     });
     await assert.rejects(api.laddersTeams(unlinked.id, workspace), /Internal Ladders/);

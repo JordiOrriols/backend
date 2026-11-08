@@ -17,7 +17,8 @@ team/member directory with team creation/renaming. Apply `sql/001-projections.sq
 `sql/010-planner-teams.sql`, `sql/011-shiplog-applications.sql` and
 `sql/012-shiplog-releases.sql`, `sql/013-shiplog-checklists.sql` and
 `sql/014-shiplog-decisions.sql`, `sql/015-shiplog-audit.sql` and
-`sql/016-ladders-teams.sql` and `sql/017-ladders-profiles.sql` and `sql/018-ladders-deletion.sql` to the isolated
+`sql/016-ladders-teams.sql` and `sql/017-ladders-profiles.sql`, `sql/018-ladders-deletion.sql` and
+`sql/019-ladders-members.sql` to the isolated
 database using its local Compose `exec db psql` command; never apply it to the
 production database. Fresh imports apply these API SQL files automatically.
 The API's workspace directory only lists explicit app/workspace grants.
@@ -35,7 +36,7 @@ Planner grants do not confer Ladders access; same-email subjects remain distinct
 The isolated Ladders worktree serves authenticated hash-free `/ladders/` routes
 through the local gateway on port 5320 (direct app port 5314). It reuses UI layout,
 language/footer and team-name dialogs without initializing old browser Supabase
-or password/anonymous flows. Evaluations, member creation/moves, goals and
+or password/anonymous flows. Evaluations, member moves, goals and
 shared lifecycle remain pending; the draft is not a production replacement.
 
 Owners/editors update member profiles with
@@ -64,6 +65,20 @@ the association while retaining the application. The delete transaction clears
 trigger from implicitly deleting platform grants/workspaces. Workspace deletion
 remains an explicit shared lifecycle operation, not a side effect of team deletion.
 The existing confirmation dialog is reused; cancellation never writes.
+
+Owners/editors create members with
+`POST /api/ladders/workspaces/:workspace/teams/:team/members` using the same
+profile fields. The function locks the grant/workspace/team, rejects foreign
+teams and reuses `ladders_save_profile` validation in the same transaction.
+Invalid profiles leave no partial member. Response is `{id}` only.
+The insert trigger retains legacy authorization for all other database logins.
+For the dedicated `platform_api` login, which has no direct member INSERT
+privilege, authorization belongs to the narrow grant-scoped definer function;
+the trigger still requires an explicit team and generates ownership metadata,
+private tokens and an unlinked account exactly as before. This uses PostgreSQL
+`session_user`, not a caller-controlled setting, and does not simulate a legacy
+JWT. Direct runtime INSERT and unauthenticated legacy inserts remain denied.
+Member creation is not account mapping, invitation acceptance or token access.
 
 Internal Shiplog grants can read `GET .../applications`, returning explicit
 application fields, an `in_use` flag and workspace team IDs/names. External

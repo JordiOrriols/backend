@@ -57,6 +57,17 @@ const database = new PlatformDatabase(required("DATABASE_URL"));
 
 @Controller("api")
 class PlatformController {
+  @Post("ladders/workspaces/:workspace/teams/:team/members")
+  async laddersCreateMember(
+    @Headers("cf-access-jwt-assertion") token: string | undefined,
+    @Param("workspace", new ParseUUIDPipe()) workspace: string,
+    @Param("team", new ParseUUIDPipe()) team: string,
+    @Body() body: unknown
+  ) {
+    return this.execute(token, (id) =>
+      database.laddersCreateMember(id, workspace, team, memberProfileInput(body))
+    );
+  }
   @Delete("ladders/workspaces/:workspace/members/:member")
   async laddersDeleteMember(
     @Headers("cf-access-jwt-assertion") token: string | undefined,

@@ -6,6 +6,7 @@ import type {
   FeatureInput,
   VacationInput,
   CalibrationInput,
+  PlanningRole,
 } from "./planner-input.js";
 
 export const APPLICATIONS = ["planner", "shiplog", "ladders", "pulse", "agents"] as const;
@@ -144,6 +145,27 @@ export class PlatformDatabase {
     const result = await this.pool.query<{ calendar: unknown }>(
       "SELECT platform.planner_calendar($1,$2) AS calendar",
       [accountId, workspaceId]
+    );
+    return result.rows[0]!.calendar;
+  }
+
+  async plannerCreateTeam(accountId: string, workspaceId: string, name: string): Promise<unknown> {
+    const result = await this.pool.query<{ calendar: unknown }>(
+      "SELECT platform.planner_create_team($1,$2,$3) AS calendar",
+      [accountId, workspaceId, name]
+    );
+    return result.rows[0]!.calendar;
+  }
+
+  async plannerPlanningRole(
+    accountId: string,
+    workspaceId: string,
+    memberId: string,
+    role: PlanningRole | null
+  ): Promise<unknown> {
+    const result = await this.pool.query<{ calendar: unknown }>(
+      "SELECT platform.planner_planning_role($1,$2,$3,$4) AS calendar",
+      [accountId, workspaceId, memberId, role]
     );
     return result.rows[0]!.calendar;
   }

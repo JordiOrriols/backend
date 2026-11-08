@@ -1,6 +1,33 @@
 import { BadRequestException } from "@nestjs/common";
 
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+export type PlanningRole = "backend" | "frontend" | "design" | "qa";
+export function planningRoleInput(body: unknown): PlanningRole | null {
+  if (!body || typeof body !== "object" || !("role" in body))
+    throw new BadRequestException("Planning role is required");
+  const role = body.role;
+  if (
+    role !== null &&
+    role !== "backend" &&
+    role !== "frontend" &&
+    role !== "design" &&
+    role !== "qa"
+  )
+    throw new BadRequestException("Invalid planning role");
+  return role;
+}
+export function teamNameInput(body: unknown): string {
+  if (
+    !body ||
+    typeof body !== "object" ||
+    !("name" in body) ||
+    typeof body.name !== "string" ||
+    !body.name.trim() ||
+    Array.from(body.name.trim()).length > 120
+  )
+    throw new BadRequestException("Team names need between 1 and 120 characters");
+  return body.name.trim();
+}
 export interface PriorityInput {
   featureIds: string[];
   expectedRevision: string;

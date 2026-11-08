@@ -11,6 +11,8 @@ import {
   dateInput,
   vacationInput,
   calibrationInput,
+  teamNameInput,
+  planningRoleInput,
 } from "../src/planner-input.js";
 
 const input = {
@@ -34,6 +36,16 @@ test("priority requests require a canonical revision and a unique UUID order", (
     { ...input, expectedRevision: "stale" },
   ])
     assert.throws(() => priorityInput(invalid));
+});
+test("team names and planning roles validate exact boundaries and explicit unassignment", () => {
+  assert.equal(teamNameInput({ name: "  Core  " }), "Core");
+  assert.equal(teamNameInput({ name: "a".repeat(120) }).length, 120);
+  for (const invalid of [null, {}, { name: 3 }, { name: " " }, { name: "a".repeat(121) }])
+    assert.throws(() => teamNameInput(invalid));
+  for (const role of ["backend", "frontend", "design", "qa", null])
+    assert.equal(planningRoleInput({ role }), role);
+  for (const invalid of [null, {}, { role: "" }, { role: "owner" }, { role: undefined }])
+    assert.throws(() => planningRoleInput(invalid));
 });
 test("vacation input enforces exact booleans and inclusive ranges of at most 366 days", () => {
   const range = { start: "2026-01-01", end: "2027-01-01", working: false };

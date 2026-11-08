@@ -75,6 +75,14 @@ test("calendar projections and edits isolate workspace roster, restore working d
       /edit access required/
     );
     await assert.rejects(
+      api.plannerPlanningRole(account.id, workspace, member, "qa"),
+      /edit access required/
+    );
+    await assert.rejects(
+      api.plannerCreateTeam(account.id, workspace, "Viewer cannot create"),
+      /owner access required/
+    );
+    await assert.rejects(
       api.plannerCalendar(account.id, other),
       /Internal Planner access required/
     );
@@ -92,6 +100,69 @@ test("calendar projections and edits isolate workspace roster, restore working d
       expectedRevision: source.revision,
     });
     const saved = await api.plannerSavedProposal(account.id, workspace, snapshot);
+    const protectedMember = (
+      await admin.query(
+        "SELECT id,team_id,role,owner_id,user_id,self_token,peer_token,view_token,vacation_token FROM public.members WHERE id=$1",
+        [member]
+      )
+    ).rows[0];
+    await assert.rejects(
+      api.plannerCreateTeam(account.id, workspace, "Editor cannot create"),
+      /owner access required/
+    );
+    await assert.rejects(
+      api.plannerPlanningRole(account.id, workspace, stranger, "qa"),
+      /Member unavailable/
+    );
+    await api.plannerPlanningRole(account.id, workspace, member, "frontend");
+    assert.notDeepEqual(await api.plannerSource(account.id, workspace), source);
+    assert.equal(
+      (await admin.query("SELECT planning_role FROM public.members WHERE id=$1", [member])).rows[0]
+        .planning_role,
+      "frontend"
+    );
+    await api.plannerPlanningRole(account.id, workspace, member, null);
+    assert.equal(
+      (await admin.query("SELECT planning_role FROM public.members WHERE id=$1", [member])).rows[0]
+        .planning_role,
+      null
+    );
+    await api.plannerPlanningRole(account.id, workspace, member, "backend");
+    assert.deepEqual(
+      (
+        await admin.query(
+          "SELECT id,team_id,role,owner_id,user_id,self_token,peer_token,view_token,vacation_token FROM public.members WHERE id=$1",
+          [member]
+        )
+      ).rows[0],
+      protectedMember
+    );
+    await assert.rejects(
+      api.pool.query("SELECT platform.planner_planning_role($1,$2,$3,$4)", [
+        account.id,
+        workspace,
+        member,
+        "invalid",
+      ]),
+      /Invalid planning role/
+    );
+    await admin.query("UPDATE platform.grants SET role='owner' WHERE user_id=$1", [account.id]);
+    await assert.rejects(api.plannerCreateTeam(account.id, workspace, " "), /Team names/);
+    await assert.rejects(
+      api.plannerCreateTeam(account.id, workspace, "a".repeat(121)),
+      /Team names/
+    );
+    await api.plannerCreateTeam(account.id, workspace, "  Created planning team  ");
+    assert.deepEqual(
+      (
+        await admin.query(
+          "SELECT owner_id,name FROM public.teams WHERE workspace_id=$1 AND name='Created planning team'",
+          [workspace]
+        )
+      ).rows,
+      [{ owner_id: owner, name: "Created planning team" }]
+    );
+    await admin.query("UPDATE platform.grants SET role='editor' WHERE user_id=$1", [account.id]);
     await assert.rejects(
       api.plannerVacations(account.id, workspace, stranger, {
         start: "2026-02-02",
@@ -163,6 +234,10 @@ test("calendar projections and edits isolate workspace roster, restore working d
     assert.deepEqual(await api.plannerSavedProposal(account.id, workspace, snapshot), saved);
     await admin.query("DELETE FROM platform.grants WHERE user_id=$1", [account.id]);
     await assert.rejects(
+      api.plannerPlanningRole(account.id, workspace, member, "qa"),
+      /edit access required/
+    );
+    await assert.rejects(
       api.plannerVacations(account.id, workspace, member, {
         start: "2026-02-02",
         end: "2026-02-04",
@@ -186,7 +261,9 @@ test("calendar projections and edits isolate workspace roster, restore working d
       [member, stranger],
     ]);
     await admin.query("DELETE FROM public.members WHERE id=ANY($1::uuid[])", [[member, stranger]]);
-    await admin.query("DELETE FROM public.teams WHERE id=ANY($1::uuid[])", [[team, otherTeam]]);
+    await admin.query("DELETE FROM public.teams WHERE workspace_id=ANY($1::uuid[])", [
+      [workspace, other],
+    ]);
     await admin.query("DELETE FROM public.workspaces WHERE id=ANY($1::uuid[])", [
       [workspace, other],
     ]);

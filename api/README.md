@@ -120,8 +120,20 @@ in the scheduler bundle, preserving its calendar, alignment, uniqueness and
 nonnegative-point rules. Writes lock the grant/workspace and preserve proposal
 snapshots. The authenticated vacation route reuses the existing calendar,
 timeline, capacity forecast and calibration modal.
-Team creation/planning-role editing and reviewed member identity mapping are
-still pending; no anonymous member vacation links are active in this branch.
+Planner owners can create teams using `POST .../teams` with `{name}` (trimmed,
+1–120 characters). Editors cannot add teams, preserving the existing owner-only
+behavior. Owners/editors can change or clear a member's planning role through
+`PATCH .../members/:member/planning-role` with `{role}`: backend, frontend,
+design, qa or explicit null. The member must belong to this workspace.
+Only the planning role changes, not job titles, identity links or share tokens.
+Writes lock the grant/workspace, refresh capacity/roadmap inputs and preserve
+proposal snapshots. The existing team configuration view is shared with the
+legacy adapter; the API version has no copy-vacation-link action.
+During compatibility migration, new teams retain the workspace's legacy
+storage-owner foreign key. This is not an identity link or a legacy permission
+grant for the Access caller. Authorization uses platform grants only.
+Reviewed member identity mapping remains pending; no anonymous member vacation
+links are active in this branch.
 
 Root `npm test` runs the legacy migration tests only. The separate API package
 uses Node's test runner via `npm --prefix api test`; CI installs and compiles

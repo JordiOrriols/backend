@@ -32,6 +32,8 @@ import {
   dateInput,
   vacationInput,
   calibrationInput,
+  teamNameInput,
+  planningRoleInput,
 } from "./planner-input.js";
 
 function required(name: string): string {
@@ -45,6 +47,29 @@ const database = new PlatformDatabase(required("DATABASE_URL"));
 
 @Controller("api")
 class PlatformController {
+  @Post("planner/workspaces/:workspace/teams")
+  async createTeam(
+    @Headers("cf-access-jwt-assertion") token: string | undefined,
+    @Param("workspace", new ParseUUIDPipe()) workspace: string,
+    @Body() body: unknown
+  ) {
+    return this.execute(token, (id) =>
+      database.plannerCreateTeam(id, workspace, teamNameInput(body))
+    );
+  }
+
+  @Patch("planner/workspaces/:workspace/members/:member/planning-role")
+  async planningRole(
+    @Headers("cf-access-jwt-assertion") token: string | undefined,
+    @Param("workspace", new ParseUUIDPipe()) workspace: string,
+    @Param("member", new ParseUUIDPipe()) member: string,
+    @Body() body: unknown
+  ) {
+    return this.execute(token, (id) =>
+      database.plannerPlanningRole(id, workspace, member, planningRoleInput(body))
+    );
+  }
+
   @Get("planner/workspaces/:workspace/calendar")
   async calendar(
     @Headers("cf-access-jwt-assertion") token: string | undefined,

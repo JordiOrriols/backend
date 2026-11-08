@@ -56,6 +56,34 @@ const database = new PlatformDatabase(required("DATABASE_URL"));
 
 @Controller("api")
 class PlatformController {
+  @Get("ladders/workspaces/:workspace/teams")
+  async laddersTeams(
+    @Headers("cf-access-jwt-assertion") token: string | undefined,
+    @Param("workspace", new ParseUUIDPipe()) workspace: string
+  ) {
+    return this.execute(token, (id) => database.laddersTeams(id, workspace));
+  }
+  @Post("ladders/workspaces/:workspace/teams")
+  async laddersCreateTeam(
+    @Headers("cf-access-jwt-assertion") token: string | undefined,
+    @Param("workspace", new ParseUUIDPipe()) workspace: string,
+    @Body() body: unknown
+  ) {
+    return this.execute(token, (id) =>
+      database.laddersSaveTeam(id, workspace, teamNameInput(body), null)
+    );
+  }
+  @Patch("ladders/workspaces/:workspace/teams/:team")
+  async laddersRenameTeam(
+    @Headers("cf-access-jwt-assertion") token: string | undefined,
+    @Param("workspace", new ParseUUIDPipe()) workspace: string,
+    @Param("team", new ParseUUIDPipe()) team: string,
+    @Body() body: unknown
+  ) {
+    return this.execute(token, (id) =>
+      database.laddersSaveTeam(id, workspace, teamNameInput(body), team)
+    );
+  }
   @Get("shiplog/workspaces/:workspace/audit")
   async audit(
     @Headers("cf-access-jwt-assertion") token: string | undefined,

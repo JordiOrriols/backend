@@ -2,26 +2,41 @@
 
 This isolated branch adds a NestJS/TypeScript API and plain PostgreSQL 17.
 It does not modify production workflows or publish packages.
-Three application adapters, shared workspace lifecycle and explicit legacy account
-mapping are not migrated yet.
+Ladders evaluations/member management, the Pulse/Agents adapters, shared workspace
+lifecycle and explicit legacy account mapping are not migrated yet.
 
 The Shiplog and Planner isolated worktrees implement reduced views
 at `/shiplog/workspaces/:workspace/releases` and
 `/planner/workspaces/:workspace/roadmap`, with the Planner editing operations
-described below. Other internal edits and the other three adapters are still
-pending. Apply `sql/001-projections.sql` and
+described below. Shiplog primary workflows are API-backed, and Ladders now has a
+team/member directory with team creation/renaming. Apply `sql/001-projections.sql` and
 `sql/002-planner-source.sql`, `sql/003-planner-proposals.sql` and
 `sql/004-planner-markers.sql`, `sql/005-planner-priorities.sql` and
 `sql/006-planner-projects.sql`, `sql/007-planner-features.sql` and
 `sql/008-planner-roadmap-settings.sql`, `sql/009-planner-calendar.sql`,
 `sql/010-planner-teams.sql`, `sql/011-shiplog-applications.sql` and
 `sql/012-shiplog-releases.sql`, `sql/013-shiplog-checklists.sql` and
-`sql/014-shiplog-decisions.sql` and `sql/015-shiplog-audit.sql` to the isolated
+`sql/014-shiplog-decisions.sql`, `sql/015-shiplog-audit.sql` and
+`sql/016-ladders-teams.sql` to the isolated
 database using its local Compose `exec db psql` command; never apply it to the
 production database. Fresh imports apply these API SQL files automatically.
 The API's workspace directory only lists explicit app/workspace grants.
 Catalog responses reuse the existing reduced release projection, without
 private engineering notes, audit entries or token settings.
+
+Ladders internal grants read `GET /api/ladders/workspaces/:workspace/teams`.
+The response contains team IDs/names and member IDs/team IDs/names/roles/planning
+roles, never legacy owner/account IDs, personal tokens, evaluations or comments.
+Only owners create with `POST .../teams`; owners/editors rename with
+`PATCH .../teams/:team`. Shared name validation enforces 1-120 trimmed characters.
+Writes lock the explicit Ladders grant and workspace and reject foreign team IDs.
+Legacy workspace-owner FKs remain storage metadata, not verified identity links.
+Planner grants do not confer Ladders access; same-email subjects remain distinct.
+The isolated Ladders worktree serves authenticated hash-free `/ladders/` routes
+through the local gateway on port 5320 (direct app port 5314). It reuses UI layout,
+language/footer and team-name dialogs without initializing old browser Supabase
+or password/anonymous flows. Evaluations, member writes, goals, deletion and
+shared lifecycle remain pending; the draft is not a production replacement.
 
 Internal Shiplog grants can read `GET .../applications`, returning explicit
 application fields, an `in_use` flag and workspace team IDs/names. External

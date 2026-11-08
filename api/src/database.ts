@@ -32,6 +32,25 @@ export interface PriorityProposal {
 }
 
 export class PlatformDatabase {
+  async laddersTeams(account: string, workspace: string): Promise<unknown> {
+    const result = await this.pool.query<{ data: unknown }>(
+      "SELECT platform.ladders_teams($1,$2) AS data",
+      [account, workspace]
+    );
+    return result.rows[0]!.data;
+  }
+  async laddersSaveTeam(
+    account: string,
+    workspace: string,
+    name: string,
+    team: string | null
+  ): Promise<unknown> {
+    const result = await this.pool.query<{ data: unknown }>(
+      "SELECT platform.ladders_save_team($1,$2,$3,$4) AS data",
+      [account, workspace, name, team]
+    );
+    return result.rows[0]!.data;
+  }
   async shiplogAudit(
     account: string,
     workspace: string,

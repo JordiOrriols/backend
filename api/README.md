@@ -2,7 +2,7 @@
 
 This isolated branch adds a NestJS/TypeScript API and plain PostgreSQL 17.
 It does not modify production workflows or publish packages.
-Ladders evaluations/goals, the Pulse/Agents adapters, shared workspace
+Ladders evaluation edits/goals, the Pulse/Agents adapters, shared workspace
 lifecycle and explicit legacy account mapping are not migrated yet.
 
 The Shiplog and Planner isolated worktrees implement reduced views
@@ -18,7 +18,8 @@ team/member directory with team creation/renaming. Apply `sql/001-projections.sq
 `sql/012-shiplog-releases.sql`, `sql/013-shiplog-checklists.sql` and
 `sql/014-shiplog-decisions.sql`, `sql/015-shiplog-audit.sql` and
 `sql/016-ladders-teams.sql` and `sql/017-ladders-profiles.sql`, `sql/018-ladders-deletion.sql` and
-`sql/019-ladders-members.sql` and `sql/020-ladders-member-moves.sql` to the isolated
+`sql/019-ladders-members.sql`, `sql/020-ladders-member-moves.sql` and
+`sql/021-ladders-evaluation-history.sql` to the isolated
 database using its local Compose `exec db psql` command; never apply it to the
 production database. Fresh imports apply these API SQL files automatically.
 The API's workspace directory only lists explicit app/workspace grants.
@@ -36,7 +37,7 @@ Planner grants do not confer Ladders access; same-email subjects remain distinct
 The isolated Ladders worktree serves authenticated hash-free `/ladders/` routes
 through the local gateway on port 5320 (direct app port 5314). It reuses UI layout,
 language/footer and team-name dialogs without initializing old browser Supabase
-or password/anonymous flows. Evaluations, goals and
+or password/anonymous flows. Evaluation edits, goals and
 shared lifecycle remain pending; the draft is not a production replacement.
 
 Owners/editors update member profiles with
@@ -94,6 +95,21 @@ and vacations. The existing linked-account-per-team unique constraint yields
 409 without clearing either link or partially moving a member. Moving to the
 current team returns the roster without changing its timestamp. The frontend
 reuses UI's accessible team selector, saves explicitly and keeps its member URL.
+
+Internal Ladders owner/editor/viewer grants read
+`GET /api/ladders/workspaces/:workspace/members/:member/evaluations`.
+The explicit projection returns evaluation ID/member ID/kind/status/author name,
+current and goal levels, comments, comment-visibility metadata and creation date,
+ordered newest-first with ID tie-breaking. All self drafts remain excluded,
+including for managers, as in legacy team RLS. Manager/peer drafts and hidden
+comments remain available to internal reviewers; this is not an employee-safe
+read endpoint. No legacy owner/account/share-token fields are included. Missing
+or foreign members return 404, unrelated app grants/same-email subjects and
+revoked access confer no permission. Runtime direct evaluation SELECT is denied.
+Reads do not mutate imported history or enable status/deletion/content edits.
+The frontend reuses the existing history/compare/competency/comment/template
+components and strictly validates member IDs, kinds, statuses, dates and
+half-step competency levels before rendering.
 
 Internal Shiplog grants can read `GET .../applications`, returning explicit
 application fields, an `in_use` flag and workspace team IDs/names. External

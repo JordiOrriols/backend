@@ -14,7 +14,7 @@ pending. Apply `sql/001-projections.sql` and
 `sql/006-planner-projects.sql`, `sql/007-planner-features.sql` and
 `sql/008-planner-roadmap-settings.sql`, `sql/009-planner-calendar.sql`,
 `sql/010-planner-teams.sql`, `sql/011-shiplog-applications.sql` and
-`sql/012-shiplog-releases.sql` to the isolated
+`sql/012-shiplog-releases.sql` and `sql/013-shiplog-checklists.sql` to the isolated
 database using its local Compose `exec db psql` command; never apply it to the
 production database. Fresh imports apply these API SQL files automatically.
 The API's workspace directory only lists explicit app/workspace grants.
@@ -47,8 +47,24 @@ read linked IDs/names through `GET .../releases/:id/features`; external users re
 only name-only catalog content. Writes lock grants/workspace/application/release
 and audit the verified platform actor. New releases leave the legacy `created_by`
 FK unset, rather than impersonating an old account, and retain the existing
-checklist snapshot trigger. Readiness/checklists, approvals and the audit history
-endpoint/view remain pending.
+checklist snapshot trigger.
+
+Internal Shiplog grants read application checklist templates and release
+readiness through `GET .../applications/:id/checklist-template` and
+`GET .../releases/:id/readiness`. Only owners save templates with `PATCH`,
+providing the current revision and at most 100 validated item definitions.
+Stale revisions return 409; reload before saving. The existing release creation
+trigger snapshots templates, so edits affect only future releases.
+Owners/editors complete or clear checks through
+`PATCH .../releases/:id/checklist/:item` with `{ completed: boolean }`.
+Release/item/workspace boundaries are enforced under locks. QA completion does
+not change manual release status. Verified platform completion actors are stored
+separately in `platform.shiplog_checklist_completions`, never written into legacy
+actor FKs. Reads preserve imported completion unless explicitly changed; repeated
+completion preserves the original completion actor/time. All writes audit the
+platform actor. Viewers inspect QA without writing; external grants cannot read
+templates/readiness. Existing template, QA modal and checklist views are shared
+with legacy adapters. Approvals and the audit history endpoint/view remain pending.
 
 The API Docker build uses the `planner` additional build context and a BuildKit
 GitHub token secret to compile Planner's existing scheduler. The runtime image

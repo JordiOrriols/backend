@@ -1,6 +1,6 @@
 import { Pool } from "pg";
 import type { AccessIdentity } from "./access.js";
-import type { ApplicationInput, ReleaseInput } from "./shiplog-input.js";
+import type { ApplicationInput, ReleaseInput, ChecklistInput } from "./shiplog-input.js";
 import type {
   PriorityInput,
   ProposalInput,
@@ -32,6 +32,49 @@ export interface PriorityProposal {
 }
 
 export class PlatformDatabase {
+  async shiplogChecklistTemplate(
+    account: string,
+    workspace: string,
+    application: string
+  ): Promise<unknown> {
+    const result = await this.pool.query<{ data: unknown }>(
+      "SELECT platform.shiplog_checklist_template($1,$2,$3) AS data",
+      [account, workspace, application]
+    );
+    return result.rows[0]!.data;
+  }
+  async shiplogSaveChecklistTemplate(
+    account: string,
+    workspace: string,
+    application: string,
+    input: ChecklistInput
+  ): Promise<unknown> {
+    const result = await this.pool.query<{ data: unknown }>(
+      "SELECT platform.shiplog_save_checklist_template($1,$2,$3,$4) AS data",
+      [account, workspace, application, input]
+    );
+    return result.rows[0]!.data;
+  }
+  async shiplogReadiness(account: string, workspace: string, release: string): Promise<unknown> {
+    const result = await this.pool.query<{ data: unknown }>(
+      "SELECT platform.shiplog_readiness($1,$2,$3) AS data",
+      [account, workspace, release]
+    );
+    return result.rows[0]!.data;
+  }
+  async shiplogCompleteChecklistItem(
+    account: string,
+    workspace: string,
+    release: string,
+    item: string,
+    completed: boolean
+  ): Promise<unknown> {
+    const result = await this.pool.query<{ data: unknown }>(
+      "SELECT platform.shiplog_complete_checklist_item($1,$2,$3,$4,$5) AS data",
+      [account, workspace, release, item, completed]
+    );
+    return result.rows[0]!.data;
+  }
   async shiplogReleaseFeatures(
     account: string,
     workspace: string,

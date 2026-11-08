@@ -1,7 +1,12 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
-import { applicationInput, releaseInput } from "../src/shiplog-input.js";
+import {
+  applicationInput,
+  releaseInput,
+  checklistInput,
+  checklistCompletionInput,
+} from "../src/shiplog-input.js";
 
 test("application inputs validate limits, require explicit team and whitelist editable fields", () => {
   const input = { name: "  Core  ", description: "Details", team_id: randomUUID() };
@@ -40,6 +45,52 @@ test("release configuration validates semantic versions, explicit links and edit
   assert.deepEqual(releaseInput({ ...input, created_by: randomUUID() }), {
     ...input,
     title: "Release",
+  });
+
+  test("checklist templates validate exact limits and whitelist definitions; completion requires a boolean", () => {
+    const item = { category: " QA ", title: " Check ", description: "Details", mandatory: true };
+    assert.deepEqual(checklistInput({ revision: 0, items: [{ ...item, id: randomUUID() }] }), {
+      revision: 0,
+      items: [{ ...item, category: "QA", title: "Check" }],
+    });
+    const max = {
+      category: "c".repeat(80),
+      title: "t".repeat(160),
+      description: "d".repeat(4000),
+      mandatory: false,
+    };
+    assert.equal(checklistInput({ revision: 10, items: Array(100).fill(max) }).items.length, 100);
+    for (const invalid of [
+      null,
+      [],
+      {},
+      { revision: -1, items: [] },
+      { revision: 0.5, items: [] },
+      { revision: 2147483647, items: [] },
+      { revision: 0, items: null },
+      { revision: 0, items: Array(101).fill(item) },
+      ...[
+        null,
+        [],
+        { ...item, title: " " },
+        { ...max, title: "t".repeat(161) },
+        { ...max, category: "c".repeat(81) },
+        { ...max, description: "d".repeat(4001) },
+        { ...item, mandatory: "true" },
+      ].map((value) => ({ revision: 0, items: [value] })),
+    ])
+      assert.throws(() => checklistInput(invalid));
+    assert.equal(checklistCompletionInput({ completed: true, actor_id: randomUUID() }), true);
+    assert.equal(checklistCompletionInput({ completed: false }), false);
+    for (const invalid of [
+      null,
+      [],
+      {},
+      { completed: null },
+      { completed: "false" },
+      { completed: 1 },
+    ])
+      assert.throws(() => checklistCompletionInput(invalid));
   });
   assert.equal(
     releaseInput({ ...input, version: "1.0.0+" + "a".repeat(94), feature_ids: null }).version

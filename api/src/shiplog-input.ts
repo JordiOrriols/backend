@@ -64,3 +64,63 @@ export function releaseInput(body: unknown): ReleaseInput {
     feature_ids: fields.feature_ids,
   };
 }
+
+export interface ChecklistItem {
+  category: string;
+  title: string;
+  description: string;
+  mandatory: boolean;
+}
+export interface ChecklistInput {
+  revision: number;
+  items: ChecklistItem[];
+}
+export function checklistInput(body: unknown): ChecklistInput {
+  if (!body || typeof body !== "object" || Array.isArray(body))
+    throw new BadRequestException("Checklist template is required");
+  const fields = Object.fromEntries(Object.entries(body));
+  if (
+    typeof fields.revision !== "number" ||
+    !Number.isSafeInteger(fields.revision) ||
+    fields.revision < 0 ||
+    fields.revision >= 2147483647 ||
+    !Array.isArray(fields.items) ||
+    fields.items.length > 100
+  )
+    throw new BadRequestException("Invalid checklist revision or items");
+  const items = fields.items.map((value: unknown): ChecklistItem => {
+    if (!value || typeof value !== "object" || Array.isArray(value))
+      throw new BadRequestException("Invalid checklist item");
+    const item = Object.fromEntries(Object.entries(value));
+    if (
+      typeof item.category !== "string" ||
+      !item.category.trim() ||
+      Array.from(item.category.trim()).length > 80 ||
+      typeof item.title !== "string" ||
+      !item.title.trim() ||
+      Array.from(item.title.trim()).length > 160 ||
+      typeof item.description !== "string" ||
+      Array.from(item.description).length > 4000 ||
+      typeof item.mandatory !== "boolean"
+    )
+      throw new BadRequestException("Invalid checklist item");
+    return {
+      category: item.category.trim(),
+      title: item.title.trim(),
+      description: item.description,
+      mandatory: item.mandatory,
+    };
+  });
+  return { revision: fields.revision, items };
+}
+export function checklistCompletionInput(body: unknown): boolean {
+  if (
+    !body ||
+    typeof body !== "object" ||
+    Array.isArray(body) ||
+    !("completed" in body) ||
+    typeof body.completed !== "boolean"
+  )
+    throw new BadRequestException("Checklist completion state is required");
+  return body.completed;
+}

@@ -21,7 +21,12 @@ import { NestFactory } from "@nestjs/core";
 import { AccessVerifier } from "./access.js";
 import { APPLICATIONS, PlatformDatabase } from "./database.js";
 import { buildPublicRoadmap, hasHolidayCalendar, validateSprintSettings } from "./scheduler.mjs";
-import { applicationInput, releaseInput } from "./shiplog-input.js";
+import {
+  applicationInput,
+  releaseInput,
+  checklistInput,
+  checklistCompletionInput,
+} from "./shiplog-input.js";
 import {
   priorityInput,
   proposalInput,
@@ -48,6 +53,53 @@ const database = new PlatformDatabase(required("DATABASE_URL"));
 
 @Controller("api")
 class PlatformController {
+  @Get("shiplog/workspaces/:workspace/applications/:application/checklist-template")
+  async checklistTemplate(
+    @Headers("cf-access-jwt-assertion") token: string | undefined,
+    @Param("workspace", new ParseUUIDPipe()) workspace: string,
+    @Param("application", new ParseUUIDPipe()) application: string
+  ) {
+    return this.execute(token, (id) =>
+      database.shiplogChecklistTemplate(id, workspace, application)
+    );
+  }
+  @Patch("shiplog/workspaces/:workspace/applications/:application/checklist-template")
+  async saveChecklistTemplate(
+    @Headers("cf-access-jwt-assertion") token: string | undefined,
+    @Param("workspace", new ParseUUIDPipe()) workspace: string,
+    @Param("application", new ParseUUIDPipe()) application: string,
+    @Body() body: unknown
+  ) {
+    return this.execute(token, (id) =>
+      database.shiplogSaveChecklistTemplate(id, workspace, application, checklistInput(body))
+    );
+  }
+  @Get("shiplog/workspaces/:workspace/releases/:release/readiness")
+  async readiness(
+    @Headers("cf-access-jwt-assertion") token: string | undefined,
+    @Param("workspace", new ParseUUIDPipe()) workspace: string,
+    @Param("release", new ParseUUIDPipe()) release: string
+  ) {
+    return this.execute(token, (id) => database.shiplogReadiness(id, workspace, release));
+  }
+  @Patch("shiplog/workspaces/:workspace/releases/:release/checklist/:item")
+  async completeChecklistItem(
+    @Headers("cf-access-jwt-assertion") token: string | undefined,
+    @Param("workspace", new ParseUUIDPipe()) workspace: string,
+    @Param("release", new ParseUUIDPipe()) release: string,
+    @Param("item", new ParseUUIDPipe()) item: string,
+    @Body() body: unknown
+  ) {
+    return this.execute(token, (id) =>
+      database.shiplogCompleteChecklistItem(
+        id,
+        workspace,
+        release,
+        item,
+        checklistCompletionInput(body)
+      )
+    );
+  }
   @Get("shiplog/workspaces/:workspace/features")
   async shiplogFeatures(
     @Headers("cf-access-jwt-assertion") token: string | undefined,

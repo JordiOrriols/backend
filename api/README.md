@@ -2,7 +2,8 @@
 
 This isolated branch adds a NestJS/TypeScript API and plain PostgreSQL 17.
 It does not modify production workflows or publish packages.
-Most internal editing workflows and three application adapters are not migrated yet.
+Three application adapters, shared workspace lifecycle and explicit legacy account
+mapping are not migrated yet.
 
 The Shiplog and Planner isolated worktrees implement reduced views
 at `/shiplog/workspaces/:workspace/releases` and
@@ -15,7 +16,7 @@ pending. Apply `sql/001-projections.sql` and
 `sql/008-planner-roadmap-settings.sql`, `sql/009-planner-calendar.sql`,
 `sql/010-planner-teams.sql`, `sql/011-shiplog-applications.sql` and
 `sql/012-shiplog-releases.sql`, `sql/013-shiplog-checklists.sql` and
-`sql/014-shiplog-decisions.sql` to the isolated
+`sql/014-shiplog-decisions.sql` and `sql/015-shiplog-audit.sql` to the isolated
 database using its local Compose `exec db psql` command; never apply it to the
 production database. Fresh imports apply these API SQL files automatically.
 The API's workspace directory only lists explicit app/workspace grants.
@@ -82,7 +83,19 @@ Platform decisions live separately in `platform.shiplog_release_decisions`.
 Imported legacy approvals remain untouched and are not attributed to Access
 users without explicit account mapping; mapped member display names also remain
 pending that separate step. Existing thumbs controls and QA placement are reused.
-The audit history endpoint/view remains pending.
+Internal Shiplog grants read `GET .../audit`, which merges platform and imported
+legacy events in newest-first order. Each event explicitly identifies its source;
+legacy actor UUIDs are never presented as verified platform accounts. Platform
+display names omit full email addresses. Event details retain stored snapshots,
+including application deletion history. External users cannot read the history.
+Responses contain at most 50 events and `next_cursor: string | null`; pass the
+returned `cursor` query parameter for the next page. Cursors are workspace-scoped
+source/UUID pairs, ordered by timestamp/source/ID to avoid gaps on timestamp ties.
+Missing/deleted/foreign cursor events return 404, malformed cursors return 400.
+The runtime cannot mutate either audit ledger directly. The localized read-only
+history page is linked from internal workspace, application and release navigation.
+Shiplog primary workflows are now API-backed; shared lifecycle, explicit legacy
+identity mapping and real corporate Access acceptance still remain.
 
 The API Docker build uses the `planner` additional build context and a BuildKit
 GitHub token secret to compile Planner's existing scheduler. The runtime image

@@ -136,3 +136,19 @@ export function approvalInput(body: unknown): boolean {
     throw new BadRequestException("Approval decision is required");
   return body.approved;
 }
+
+export function auditCursorInput(
+  value: unknown
+): { source: "platform" | "legacy"; id: string } | null {
+  if (value === undefined) return null;
+  if (typeof value !== "string") throw new BadRequestException("Invalid audit cursor");
+  const [source, id, extra] = value.split(":");
+  if (
+    (source !== "platform" && source !== "legacy") ||
+    !id ||
+    !uuid.test(id) ||
+    extra !== undefined
+  )
+    throw new BadRequestException("Invalid audit cursor");
+  return { source, id };
+}

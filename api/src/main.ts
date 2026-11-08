@@ -11,6 +11,7 @@ import {
   Logger,
   Module,
   Param,
+  Query,
   ParseUUIDPipe,
   Post,
   Patch,
@@ -27,6 +28,7 @@ import {
   checklistInput,
   checklistCompletionInput,
   approvalInput,
+  auditCursorInput,
 } from "./shiplog-input.js";
 import {
   priorityInput,
@@ -54,6 +56,16 @@ const database = new PlatformDatabase(required("DATABASE_URL"));
 
 @Controller("api")
 class PlatformController {
+  @Get("shiplog/workspaces/:workspace/audit")
+  async audit(
+    @Headers("cf-access-jwt-assertion") token: string | undefined,
+    @Param("workspace", new ParseUUIDPipe()) workspace: string,
+    @Query("cursor") cursor: unknown
+  ) {
+    return this.execute(token, (id) =>
+      database.shiplogAudit(id, workspace, auditCursorInput(cursor))
+    );
+  }
   @Get("shiplog/workspaces/:workspace/releases/:release/decisions")
   async decisions(
     @Headers("cf-access-jwt-assertion") token: string | undefined,

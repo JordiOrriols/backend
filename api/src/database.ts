@@ -32,6 +32,17 @@ export interface PriorityProposal {
 }
 
 export class PlatformDatabase {
+  async shiplogAudit(
+    account: string,
+    workspace: string,
+    cursor: { source: "platform" | "legacy"; id: string } | null
+  ): Promise<unknown> {
+    const result = await this.pool.query<{ data: unknown }>(
+      "SELECT platform.shiplog_audit($1,$2,$3,$4) AS data",
+      [account, workspace, cursor?.source ?? null, cursor?.id ?? null]
+    );
+    return result.rows[0]!.data;
+  }
   async shiplogDecisions(account: string, workspace: string, release: string): Promise<unknown> {
     const result = await this.pool.query<{ data: unknown }>(
       "SELECT platform.shiplog_decisions($1,$2,$3) AS data",

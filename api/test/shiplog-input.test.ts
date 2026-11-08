@@ -7,6 +7,7 @@ import {
   checklistInput,
   checklistCompletionInput,
   approvalInput,
+  auditCursorInput,
 } from "../src/shiplog-input.js";
 
 test("application inputs validate limits, require explicit team and whitelist editable fields", () => {
@@ -67,6 +68,23 @@ test("release configuration validates semantic versions, explicit links and edit
         { approved: 0 },
       ])
         assert.throws(() => approvalInput(invalid));
+    });
+
+    test("audit pagination validates source and exact UUID cursor without accepting arrays or empty values", () => {
+      const id = randomUUID();
+      assert.equal(auditCursorInput(undefined), null);
+      assert.deepEqual(auditCursorInput(`platform:${id}`), { source: "platform", id });
+      assert.deepEqual(auditCursorInput(`legacy:${id}`), { source: "legacy", id });
+      for (const invalid of [
+        null,
+        "",
+        [],
+        ["platform:" + id],
+        "other:" + id,
+        "platform:bad",
+        `platform:${id}:extra`,
+      ])
+        assert.throws(() => auditCursorInput(invalid));
     });
     const max = {
       category: "c".repeat(80),

@@ -26,6 +26,7 @@ import {
   releaseInput,
   checklistInput,
   checklistCompletionInput,
+  approvalInput,
 } from "./shiplog-input.js";
 import {
   priorityInput,
@@ -53,6 +54,25 @@ const database = new PlatformDatabase(required("DATABASE_URL"));
 
 @Controller("api")
 class PlatformController {
+  @Get("shiplog/workspaces/:workspace/releases/:release/decisions")
+  async decisions(
+    @Headers("cf-access-jwt-assertion") token: string | undefined,
+    @Param("workspace", new ParseUUIDPipe()) workspace: string,
+    @Param("release", new ParseUUIDPipe()) release: string
+  ) {
+    return this.execute(token, (id) => database.shiplogDecisions(id, workspace, release));
+  }
+  @Patch("shiplog/workspaces/:workspace/releases/:release/decision")
+  async decideRelease(
+    @Headers("cf-access-jwt-assertion") token: string | undefined,
+    @Param("workspace", new ParseUUIDPipe()) workspace: string,
+    @Param("release", new ParseUUIDPipe()) release: string,
+    @Body() body: unknown
+  ) {
+    return this.execute(token, (id) =>
+      database.shiplogDecideRelease(id, workspace, release, approvalInput(body))
+    );
+  }
   @Get("shiplog/workspaces/:workspace/applications/:application/checklist-template")
   async checklistTemplate(
     @Headers("cf-access-jwt-assertion") token: string | undefined,

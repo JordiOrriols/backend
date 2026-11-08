@@ -14,7 +14,8 @@ pending. Apply `sql/001-projections.sql` and
 `sql/006-planner-projects.sql`, `sql/007-planner-features.sql` and
 `sql/008-planner-roadmap-settings.sql`, `sql/009-planner-calendar.sql`,
 `sql/010-planner-teams.sql`, `sql/011-shiplog-applications.sql` and
-`sql/012-shiplog-releases.sql` and `sql/013-shiplog-checklists.sql` to the isolated
+`sql/012-shiplog-releases.sql`, `sql/013-shiplog-checklists.sql` and
+`sql/014-shiplog-decisions.sql` to the isolated
 database using its local Compose `exec db psql` command; never apply it to the
 production database. Fresh imports apply these API SQL files automatically.
 The API's workspace directory only lists explicit app/workspace grants.
@@ -64,7 +65,24 @@ actor FKs. Reads preserve imported completion unless explicitly changed; repeate
 completion preserves the original completion actor/time. All writes audit the
 platform actor. Viewers inspect QA without writing; external grants cannot read
 templates/readiness. Existing template, QA modal and checklist views are shared
-with legacy adapters. Approvals and the audit history endpoint/view remain pending.
+with legacy adapters.
+
+Internal Shiplog users read `GET .../releases/:id/decisions` and record their own
+decision through `PATCH .../releases/:id/decision` with `{ approved: boolean }`.
+Viewers can decide, matching the existing independent-member approval behavior,
+but still cannot edit releases/templates/checks. Decisions are independent of
+manual status and QA. Caller identity is always taken from the verified Access
+account, never from request fields. Grant/workspace/release locks serialize writes.
+The response includes the caller account ID and only active internal grant
+participants, with IDs, email-local-part display names, decisions and dates;
+full emails and legacy member metadata are not projected. Same-email subjects
+retain distinct platform IDs. Revoked/external participants disappear from the
+directory, while their stored decisions/audit remain.
+Platform decisions live separately in `platform.shiplog_release_decisions`.
+Imported legacy approvals remain untouched and are not attributed to Access
+users without explicit account mapping; mapped member display names also remain
+pending that separate step. Existing thumbs controls and QA placement are reused.
+The audit history endpoint/view remains pending.
 
 The API Docker build uses the `planner` additional build context and a BuildKit
 GitHub token secret to compile Planner's existing scheduler. The runtime image

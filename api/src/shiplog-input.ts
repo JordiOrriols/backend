@@ -124,3 +124,15 @@ export function checklistCompletionInput(body: unknown): boolean {
     throw new BadRequestException("Checklist completion state is required");
   return body.completed;
 }
+
+export function approvalInput(body: unknown): boolean {
+  if (
+    !body ||
+    typeof body !== "object" ||
+    Array.isArray(body) ||
+    !("approved" in body) ||
+    typeof body.approved !== "boolean"
+  )
+    throw new BadRequestException("Approval decision is required");
+  return body.approved;
+}

@@ -32,6 +32,25 @@ export interface PriorityProposal {
 }
 
 export class PlatformDatabase {
+  async shiplogDecisions(account: string, workspace: string, release: string): Promise<unknown> {
+    const result = await this.pool.query<{ data: unknown }>(
+      "SELECT platform.shiplog_decisions($1,$2,$3) AS data",
+      [account, workspace, release]
+    );
+    return result.rows[0]!.data;
+  }
+  async shiplogDecideRelease(
+    account: string,
+    workspace: string,
+    release: string,
+    approved: boolean
+  ): Promise<unknown> {
+    const result = await this.pool.query<{ data: unknown }>(
+      "SELECT platform.shiplog_decide_release($1,$2,$3,$4) AS data",
+      [account, workspace, release, approved]
+    );
+    return result.rows[0]!.data;
+  }
   async shiplogChecklistTemplate(
     account: string,
     workspace: string,

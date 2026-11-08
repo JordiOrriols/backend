@@ -6,6 +6,7 @@ import {
   releaseInput,
   checklistInput,
   checklistCompletionInput,
+  approvalInput,
 } from "../src/shiplog-input.js";
 
 test("application inputs validate limits, require explicit team and whitelist editable fields", () => {
@@ -52,6 +53,20 @@ test("release configuration validates semantic versions, explicit links and edit
     assert.deepEqual(checklistInput({ revision: 0, items: [{ ...item, id: randomUUID() }] }), {
       revision: 0,
       items: [{ ...item, category: "QA", title: "Check" }],
+    });
+
+    test("approval input accepts explicit decisions and ignores caller-supplied identity", () => {
+      assert.equal(approvalInput({ approved: true, user_id: randomUUID() }), true);
+      assert.equal(approvalInput({ approved: false }), false);
+      for (const invalid of [
+        null,
+        [],
+        {},
+        { approved: null },
+        { approved: "true" },
+        { approved: 0 },
+      ])
+        assert.throws(() => approvalInput(invalid));
     });
     const max = {
       category: "c".repeat(80),

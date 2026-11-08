@@ -2,7 +2,7 @@
 
 This isolated branch adds a NestJS/TypeScript API and plain PostgreSQL 17.
 It does not modify production workflows or publish packages.
-Ladders evaluations/member management, the Pulse/Agents adapters, shared workspace
+Ladders evaluations/goals, the Pulse/Agents adapters, shared workspace
 lifecycle and explicit legacy account mapping are not migrated yet.
 
 The Shiplog and Planner isolated worktrees implement reduced views
@@ -18,7 +18,7 @@ team/member directory with team creation/renaming. Apply `sql/001-projections.sq
 `sql/012-shiplog-releases.sql`, `sql/013-shiplog-checklists.sql` and
 `sql/014-shiplog-decisions.sql`, `sql/015-shiplog-audit.sql` and
 `sql/016-ladders-teams.sql` and `sql/017-ladders-profiles.sql`, `sql/018-ladders-deletion.sql` and
-`sql/019-ladders-members.sql` to the isolated
+`sql/019-ladders-members.sql` and `sql/020-ladders-member-moves.sql` to the isolated
 database using its local Compose `exec db psql` command; never apply it to the
 production database. Fresh imports apply these API SQL files automatically.
 The API's workspace directory only lists explicit app/workspace grants.
@@ -36,7 +36,7 @@ Planner grants do not confer Ladders access; same-email subjects remain distinct
 The isolated Ladders worktree serves authenticated hash-free `/ladders/` routes
 through the local gateway on port 5320 (direct app port 5314). It reuses UI layout,
 language/footer and team-name dialogs without initializing old browser Supabase
-or password/anonymous flows. Evaluations, member moves, goals and
+or password/anonymous flows. Evaluations, goals and
 shared lifecycle remain pending; the draft is not a production replacement.
 
 Owners/editors update member profiles with
@@ -79,6 +79,21 @@ private tokens and an unlinked account exactly as before. This uses PostgreSQL
 `session_user`, not a caller-controlled setting, and does not simulate a legacy
 JWT. Direct runtime INSERT and unauthenticated legacy inserts remain denied.
 Member creation is not account mapping, invitation acceptance or token access.
+
+Owners/editors move existing members with
+`PATCH /api/ladders/workspaces/:workspace/members/:member/teams/:team` (no body).
+The grant/workspace/member/destination locks enforce same-workspace scope;
+missing or foreign members/teams return 404. Legacy cross-owner moves remain
+forbidden. The update trigger retains immutable IDs, owner, share tokens and
+invite-only linking rules. As with creation, only the dedicated `platform_api`
+login delegates legacy team authorization to the scoped definer function;
+direct runtime UPDATE is denied, while ordinary legacy owner moves still work
+and unauthenticated legacy moves remain denied. No JWT identity is simulated.
+Moves preserve linked accounts, full profiles, evaluations, goals, invitations
+and vacations. The existing linked-account-per-team unique constraint yields
+409 without clearing either link or partially moving a member. Moving to the
+current team returns the roster without changing its timestamp. The frontend
+reuses UI's accessible team selector, saves explicitly and keeps its member URL.
 
 Internal Shiplog grants can read `GET .../applications`, returning explicit
 application fields, an `in_use` flag and workspace team IDs/names. External

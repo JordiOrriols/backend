@@ -60,14 +60,48 @@ expected issuer, audience, RS256 signature, expiry and required user claims.
 The API never accepts an email header as authentication.
 Unknown issuer/subject pairs create a user with **no grants**.
 Email is metadata and never automatically links an existing account.
-Permission assignment is manual during this migration.
+Permission assignment uses the local administrator command described below.
 
 Grants are scoped to app/workspace. `external` is allowed only for Planner and
 Shiplog and will expose their reduced former shared-link projections, not private
-records. Those projection endpoints are not implemented yet.
+records. Both reduced projection endpoints are implemented.
 The API database role cannot read legacy app/account tables or assign permissions.
 There are no password, registration, recovery or anonymous endpoints.
 The production Docker image runs as a nonroot user and contains no dev tooling.
+
+### Local administrator command
+
+The user must first authenticate with Access (`GET /api/me`). Review the user's
+platform UUID **and verified issuer/subject**, not just their email: identical
+emails never imply identical accounts. This tool does not create identities,
+link legacy accounts, or change application records.
+
+Run the separate tools-profile container against the isolated database:
+
+```sh
+docker compose --env-file .env -f compose.local.yml build permissions
+docker compose --env-file .env -f compose.local.yml run --rm permissions users
+docker compose --env-file .env -f compose.local.yml run --rm permissions workspaces
+docker compose --env-file .env -f compose.local.yml run --rm permissions grants
+docker compose --env-file .env -f compose.local.yml run --rm permissions grant <platform-user-uuid> planner <workspace-uuid> external
+docker compose --env-file .env -f compose.local.yml run --rm permissions revoke <platform-user-uuid> planner <workspace-uuid>
+```
+
+Export `GITHUB_TOKEN` for the build, as for the other images. Output from `users`
+contains identity metadata and must remain private.
+Apps: `planner`, `shiplog`, `ladders`, `pulse`, `agents`.
+Roles: `owner`, `editor`, `viewer`, `external` (last only for Planner/Shiplog).
+Granting an existing app/workspace replaces its role; revocation affects only
+the specified account/app/workspace. Missing accounts, workspaces and grants
+fail explicitly. Changing a role does not yet unlock internal editing: those
+workflows remain unported.
+
+Only this separate local tools container uses the administrator connection.
+The HTTP API role still cannot assign or revoke grants, and no administrator
+endpoint or public identity directory is added. The command requires
+`LOCAL_PERMISSIONS_CONFIRM=local-only` and refuses any database target other
+than `db:5432/platform`, including connection-string host overrides.
+It is not a production administration tool.
 
 ## Validation
 
@@ -83,7 +117,7 @@ use remote Supabase; do not run them as migration validation until a separate
 local-only config and API-backed app adapters are in place.
 
 The separate `platform-local.config.ts` in the isolated E2E worktree verifies
-the new API only. Start its local signed-token fixture with:
+the new API and reduced app views. Start its local signed-token fixture with:
 
 ```sh
 docker compose --env-file .env -f compose.local.yml -f compose.test.yml up -d api access-fixture
@@ -99,7 +133,8 @@ To test the built frontend as well, export the registry `GITHUB_TOKEN` in your
 shell and run:
 
 ```sh
-docker compose --env-file .env -f compose.local.yml -f compose.test.yml up -d --build shiplog
+docker compose --env-file .env -f compose.local.yml build permissions
+docker compose --env-file .env -f compose.local.yml -f compose.test.yml --profile web up -d --build api planner shiplog gateway access-fixture
 ```
 
 Run `PLATFORM_DOCKER_WEB=1 npx playwright test --config=platform-local.config.ts`

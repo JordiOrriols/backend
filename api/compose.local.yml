@@ -35,6 +35,23 @@ services:
     depends_on:
       db: { condition: service_healthy }
     networks: [database]
+  permissions:
+    profiles: [tools]
+    build:
+      context: .
+      target: build
+      additional_contexts:
+        planner: ../../planner-access-local
+      secrets: [github_token]
+    environment:
+      DATABASE_URL: postgres://postgres:${LOCAL_DB_PASSWORD}@db:5432/platform
+      LOCAL_PERMISSIONS_CONFIRM: local-only
+    volumes:
+      - ./scripts:/app/scripts:ro
+    entrypoint: ["npm", "run", "permissions:local", "--"]
+    depends_on:
+      db: { condition: service_healthy }
+    networks: [database]
   api:
     build:
       context: .
@@ -62,6 +79,7 @@ services:
       API_DATABASE_URL: postgres://platform_api:${LOCAL_API_DB_PASSWORD}@db:5432/platform
     volumes:
       - ./test:/app/test:ro
+      - ./scripts:/app/scripts:ro
     command: ["npm", "run", "test:integration"]
     depends_on:
       db: { condition: service_healthy }

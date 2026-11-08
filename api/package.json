@@ -8,7 +8,8 @@
     "start": "node dist/main.js",
     "test": "node --import tsx --test test/*.test.ts",
     "test:integration": "node --import tsx --test test/integration/*.ts",
-    "db:import": "node --import tsx scripts/import-local.ts"
+    "db:import": "node --import tsx scripts/import-local.ts",
+    "permissions:local": "node --import tsx scripts/permissions-local.ts"
   },
   "dependencies": {
     "@nestjs/common": "^11.2.8",

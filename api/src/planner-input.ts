@@ -8,6 +8,81 @@ export interface PriorityInput {
 export interface ProposalInput extends PriorityInput {
   name: string;
 }
+export interface FeatureInput {
+  name: string;
+  description: string;
+  project_id: string;
+  status: "pending" | "in_progress" | "done" | "paused";
+  dependency_ids: string[];
+  backend_devs: number;
+  backend_weeks: number;
+  frontend_devs: number;
+  frontend_weeks: number;
+  design_devs: number;
+  design_weeks: number;
+  qa_devs: number;
+  qa_weeks: number;
+}
+
+export function featureInput(body: unknown): FeatureInput {
+  if (!body || typeof body !== "object" || Array.isArray(body))
+    throw new BadRequestException("Feature fields are required");
+  const fields: Record<string, unknown> = Object.fromEntries(Object.entries(body));
+  if (
+    typeof fields.name !== "string" ||
+    !fields.name.trim() ||
+    Array.from(fields.name.trim()).length > 120
+  )
+    throw new BadRequestException("Feature names need between 1 and 120 characters");
+  if (typeof fields.description !== "string")
+    throw new BadRequestException("Feature description must be text");
+  if (typeof fields.project_id !== "string" || !uuid.test(fields.project_id))
+    throw new BadRequestException("Feature project is required");
+  const status = fields.status;
+  if (status !== "pending" && status !== "in_progress" && status !== "done" && status !== "paused")
+    throw new BadRequestException("Invalid feature status");
+  const dependencies = fields.dependency_ids === undefined ? [] : fields.dependency_ids;
+  if (
+    !Array.isArray(dependencies) ||
+    !dependencies.every((id: unknown): id is string => typeof id === "string" && uuid.test(id)) ||
+    new Set(dependencies).size !== dependencies.length
+  )
+    throw new BadRequestException("Feature dependencies must be unique feature IDs");
+  function estimate(role: string, unit: "devs" | "weeks") {
+    const value = fields[`${role}_${unit}`];
+    if (
+      typeof value !== "number" ||
+      !Number.isInteger(value) ||
+      value < 0 ||
+      value > (unit === "devs" ? 100 : 104)
+    )
+      throw new BadRequestException(
+        "Estimates require whole people from 0-100 and whole weeks from 0-104"
+      );
+    return value;
+  }
+  const estimates = {
+    backend_devs: estimate("backend", "devs"),
+    backend_weeks: estimate("backend", "weeks"),
+    frontend_devs: estimate("frontend", "devs"),
+    frontend_weeks: estimate("frontend", "weeks"),
+    design_devs: estimate("design", "devs"),
+    design_weeks: estimate("design", "weeks"),
+    qa_devs: estimate("qa", "devs"),
+    qa_weeks: estimate("qa", "weeks"),
+  };
+  for (const role of ["backend", "frontend", "design", "qa"] as const)
+    if ((estimates[`${role}_devs`] === 0) !== (estimates[`${role}_weeks`] === 0))
+      throw new BadRequestException("Each role needs both people and weeks, or neither");
+  return {
+    name: fields.name.trim(),
+    description: fields.description,
+    project_id: fields.project_id,
+    status,
+    dependency_ids: dependencies,
+    ...estimates,
+  };
+}
 
 export function priorityInput(body: unknown): PriorityInput {
   if (!body || typeof body !== "object" || Array.isArray(body))

@@ -27,6 +27,7 @@ import {
   markerInput,
   markerNameInput,
   projectNameInput,
+  featureInput,
 } from "./planner-input.js";
 
 function required(name: string): string {
@@ -40,6 +41,48 @@ const database = new PlatformDatabase(required("DATABASE_URL"));
 
 @Controller("api")
 class PlatformController {
+  @Get("planner/workspaces/:workspace/features")
+  async features(
+    @Headers("cf-access-jwt-assertion") token: string | undefined,
+    @Param("workspace", new ParseUUIDPipe()) workspace: string
+  ) {
+    return this.execute(token, (id) => database.plannerFeatures(id, workspace));
+  }
+
+  @Post("planner/workspaces/:workspace/features")
+  async createFeature(
+    @Headers("cf-access-jwt-assertion") token: string | undefined,
+    @Param("workspace", new ParseUUIDPipe()) workspace: string,
+    @Body() body: unknown
+  ) {
+    return this.execute(token, (id) =>
+      database.plannerFeature(id, workspace, "create", null, featureInput(body))
+    );
+  }
+
+  @Patch("planner/workspaces/:workspace/features/:feature")
+  async saveFeature(
+    @Headers("cf-access-jwt-assertion") token: string | undefined,
+    @Param("workspace", new ParseUUIDPipe()) workspace: string,
+    @Param("feature", new ParseUUIDPipe()) feature: string,
+    @Body() body: unknown
+  ) {
+    return this.execute(token, (id) =>
+      database.plannerFeature(id, workspace, "save", feature, featureInput(body))
+    );
+  }
+
+  @Delete("planner/workspaces/:workspace/features/:feature")
+  async deleteFeature(
+    @Headers("cf-access-jwt-assertion") token: string | undefined,
+    @Param("workspace", new ParseUUIDPipe()) workspace: string,
+    @Param("feature", new ParseUUIDPipe()) feature: string
+  ) {
+    return this.execute(token, (id) =>
+      database.plannerFeature(id, workspace, "delete", feature, null)
+    );
+  }
+
   @Get("planner/workspaces/:workspace/projects")
   async projects(
     @Headers("cf-access-jwt-assertion") token: string | undefined,

@@ -1,6 +1,6 @@
 import { Pool } from "pg";
 import type { AccessIdentity } from "./access.js";
-import type { PriorityInput, ProposalInput } from "./planner-input.js";
+import type { PriorityInput, ProposalInput, FeatureInput } from "./planner-input.js";
 
 export const APPLICATIONS = ["planner", "shiplog", "ladders", "pulse", "agents"] as const;
 export type Application = (typeof APPLICATIONS)[number];
@@ -124,6 +124,28 @@ export class PlatformDatabase {
       [accountId, workspaceId]
     );
     return result.rows[0]!.projects;
+  }
+
+  async plannerFeatures(accountId: string, workspaceId: string): Promise<unknown> {
+    const result = await this.pool.query<{ features: unknown }>(
+      "SELECT platform.planner_features($1,$2) AS features",
+      [accountId, workspaceId]
+    );
+    return result.rows[0]!.features;
+  }
+
+  async plannerFeature(
+    accountId: string,
+    workspaceId: string,
+    action: "create" | "save" | "delete",
+    featureId: string | null,
+    input: FeatureInput | null
+  ): Promise<unknown> {
+    const result = await this.pool.query<{ feature: unknown }>(
+      "SELECT platform.planner_feature($1,$2,$3,$4,$5) AS feature",
+      [accountId, workspaceId, action, featureId, input]
+    );
+    return result.rows[0]!.feature;
   }
 
   async plannerProject(

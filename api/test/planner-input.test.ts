@@ -6,6 +6,7 @@ import {
   markerInput,
   markerNameInput,
   projectNameInput,
+  featureInput,
 } from "../src/planner-input.js";
 
 const input = {
@@ -29,6 +30,64 @@ test("priority requests require a canonical revision and a unique UUID order", (
     { ...input, expectedRevision: "stale" },
   ])
     assert.throws(() => priorityInput(invalid));
+});
+
+const feature = {
+  name: "Feature",
+  description: "Private details",
+  project_id: input.featureIds[0],
+  status: "pending",
+  dependency_ids: [],
+  backend_devs: 1,
+  backend_weeks: 2,
+  frontend_devs: 0,
+  frontend_weeks: 0,
+  design_devs: 0,
+  design_weeks: 0,
+  qa_devs: 0,
+  qa_weeks: 0,
+};
+test("feature input whitelists editable fields and validates names, status and dependency IDs", () => {
+  assert.deepEqual(
+    featureInput({ ...feature, name: " Feature ", id: "injected", in_backlog: true, priority: 99 }),
+    feature
+  );
+  assert.equal(featureInput({ ...feature, name: "a".repeat(120) }).name.length, 120);
+  for (const invalid of [
+    null,
+    [],
+    {},
+    { ...feature, name: "" },
+    { ...feature, name: "a".repeat(121) },
+    { ...feature, description: null },
+    { ...feature, project_id: "bad" },
+    { ...feature, status: "unknown" },
+    { ...feature, dependency_ids: null },
+    { ...feature, dependency_ids: ["bad"] },
+    { ...feature, dependency_ids: [input.featureIds[0], input.featureIds[0]] },
+  ])
+    assert.throws(() => featureInput(invalid));
+});
+test("feature estimates require bounded whole units and complete role pairs", () => {
+  for (const role of ["backend", "frontend", "design", "qa"])
+    for (const [devs, weeks] of [
+      [-1, 1],
+      [101, 1],
+      [1, 105],
+      [1.5, 1],
+      [1, 1.5],
+      [NaN, 1],
+      [1, Infinity],
+      [0, 1],
+      [1, 0],
+    ])
+      assert.throws(() =>
+        featureInput({ ...feature, [`${role}_devs`]: devs, [`${role}_weeks`]: weeks })
+      );
+  assert.equal(
+    featureInput({ ...feature, backend_devs: 100, backend_weeks: 104 }).backend_weeks,
+    104
+  );
 });
 test("proposal names must be nonempty, trimmed and at most 120 characters", () => {
   assert.deepEqual(proposalInput({ ...input, name: "  Alternative  " }), {

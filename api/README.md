@@ -11,7 +11,7 @@ described below. Other internal edits and the other three adapters are still
 pending. Apply `sql/001-projections.sql` and
 `sql/002-planner-source.sql`, `sql/003-planner-proposals.sql` and
 `sql/004-planner-markers.sql`, `sql/005-planner-priorities.sql` and
-`sql/006-planner-projects.sql` to the isolated
+`sql/006-planner-projects.sql` and `sql/007-planner-features.sql` to the isolated
 database using its local Compose `exec db psql` command; never apply it to the
 production database. Fresh imports apply these API SQL files automatically.
 The API's workspace directory only lists explicit app/workspace grants.
@@ -63,7 +63,7 @@ orders from the same revision cannot both succeed. The response is the newly
 scheduled reduced official roadmap, not raw scheduler inputs.
 External/viewer users, wrong-app/workspace grants and revoked accounts cannot
 perform this operation. The runtime role still cannot directly update features.
-Task CRUD, estimates and vacation editing remain pending.
+Roadmap inclusion/removal, planning settings and vacation editing remain pending.
 
 Project management reuses the existing Planner modal. Internal grants can list
 `GET .../projects`; owners/editors can create (`POST`), rename
@@ -74,6 +74,22 @@ hold the workspace lock. Deleting a project containing any feature, including
 off-roadmap backlog tasks, returns 409 without deleting anything. The modal
 disables that delete action. Wrong-workspace/missing IDs return 404; external
 users cannot read this directory. Renaming preserves ID and feature membership.
+
+Internal Planner grants can read `GET .../features`, including backlog,
+descriptions and estimates; external grants cannot. Owners/editors can create
+(`POST`), edit (`PATCH .../features/:id`) and delete (`DELETE .../features/:id`).
+The existing estimation view, cards and feature modal are reused by both the
+legacy page and the authenticated API page. Names, project IDs, statuses,
+whole-number estimates and role pairs are validated before writes.
+New tasks start outside the roadmap; editing cannot change inclusion, priority,
+ID or creation time. Moving a task to another project in the same workspace is
+allowed, but cross-workspace projects and task IDs are rejected.
+Writes hold the grant and workspace locks and reuse the existing dependency
+constraints. Self/unknown/cross-workspace dependencies, cycles, invalid roadmap
+dependency ordering, and deleting a prerequisite are rejected atomically.
+Only explicitly projected task fields are returned; the API role still cannot
+read or write the legacy feature table directly. Task edits refresh the current
+roadmap, while saved proposal snapshots are untouched.
 
 ## Local Docker
 

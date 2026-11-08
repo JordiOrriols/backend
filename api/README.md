@@ -12,12 +12,26 @@ pending. Apply `sql/001-projections.sql` and
 `sql/002-planner-source.sql`, `sql/003-planner-proposals.sql` and
 `sql/004-planner-markers.sql`, `sql/005-planner-priorities.sql` and
 `sql/006-planner-projects.sql`, `sql/007-planner-features.sql` and
-`sql/008-planner-roadmap-settings.sql` to the isolated
+`sql/008-planner-roadmap-settings.sql`, `sql/009-planner-calendar.sql`,
+`sql/010-planner-teams.sql` and `sql/011-shiplog-applications.sql` to the isolated
 database using its local Compose `exec db psql` command; never apply it to the
 production database. Fresh imports apply these API SQL files automatically.
 The API's workspace directory only lists explicit app/workspace grants.
 Catalog responses reuse the existing reduced release projection, without
 private engineering notes, audit entries or token settings.
+
+Internal Shiplog grants can read `GET .../applications`, returning explicit
+application fields, an `in_use` flag and workspace team IDs/names. External
+grants retain only the reduced catalog. Owners/editors can create (`POST`),
+edit (`PATCH .../applications/:id`) and delete (`DELETE .../applications/:id`).
+Names/descriptions/team IDs are validated; cross-workspace teams or application
+IDs are rejected. Any release prevents application deletion. Writes lock the
+grant, workspace and existing application; updates preserve identity/timestamps.
+Audit events are stored separately under `platform.shiplog_audit_events`,
+with the verified platform account as actor. They never impersonate or link
+legacy accounts. The runtime cannot read/write that audit table directly.
+The existing application form/cards are reused; release editing, readiness,
+approvals and the audit history endpoint/view remain pending.
 
 The API Docker build uses the `planner` additional build context and a BuildKit
 GitHub token secret to compile Planner's existing scheduler. The runtime image

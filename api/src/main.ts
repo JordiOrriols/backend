@@ -21,6 +21,7 @@ import { NestFactory } from "@nestjs/core";
 import { AccessVerifier } from "./access.js";
 import { APPLICATIONS, PlatformDatabase } from "./database.js";
 import { buildPublicRoadmap, hasHolidayCalendar, validateSprintSettings } from "./scheduler.mjs";
+import { applicationInput } from "./shiplog-input.js";
 import {
   priorityInput,
   proposalInput,
@@ -47,6 +48,44 @@ const database = new PlatformDatabase(required("DATABASE_URL"));
 
 @Controller("api")
 class PlatformController {
+  @Get("shiplog/workspaces/:workspace/applications")
+  async applications(
+    @Headers("cf-access-jwt-assertion") token: string | undefined,
+    @Param("workspace", new ParseUUIDPipe()) workspace: string
+  ) {
+    return this.execute(token, (id) => database.shiplogApplications(id, workspace));
+  }
+  @Post("shiplog/workspaces/:workspace/applications")
+  async createApplication(
+    @Headers("cf-access-jwt-assertion") token: string | undefined,
+    @Param("workspace", new ParseUUIDPipe()) workspace: string,
+    @Body() body: unknown
+  ) {
+    return this.execute(token, (id) =>
+      database.shiplogSaveApplication(id, workspace, applicationInput(body), null)
+    );
+  }
+  @Patch("shiplog/workspaces/:workspace/applications/:application")
+  async updateApplication(
+    @Headers("cf-access-jwt-assertion") token: string | undefined,
+    @Param("workspace", new ParseUUIDPipe()) workspace: string,
+    @Param("application", new ParseUUIDPipe()) application: string,
+    @Body() body: unknown
+  ) {
+    return this.execute(token, (id) =>
+      database.shiplogSaveApplication(id, workspace, applicationInput(body), application)
+    );
+  }
+  @Delete("shiplog/workspaces/:workspace/applications/:application")
+  async deleteApplication(
+    @Headers("cf-access-jwt-assertion") token: string | undefined,
+    @Param("workspace", new ParseUUIDPipe()) workspace: string,
+    @Param("application", new ParseUUIDPipe()) application: string
+  ) {
+    return this.execute(token, (id) =>
+      database.shiplogDeleteApplication(id, workspace, application)
+    );
+  }
   @Post("planner/workspaces/:workspace/teams")
   async createTeam(
     @Headers("cf-access-jwt-assertion") token: string | undefined,

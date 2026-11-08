@@ -1,5 +1,6 @@
 import { Pool } from "pg";
 import type { AccessIdentity } from "./access.js";
+import type { ApplicationInput } from "./shiplog-input.js";
 import type {
   PriorityInput,
   ProposalInput,
@@ -31,6 +32,36 @@ export interface PriorityProposal {
 }
 
 export class PlatformDatabase {
+  async shiplogApplications(account: string, workspace: string): Promise<unknown> {
+    const result = await this.pool.query<{ directory: unknown }>(
+      "SELECT platform.shiplog_applications($1,$2) AS directory",
+      [account, workspace]
+    );
+    return result.rows[0]!.directory;
+  }
+  async shiplogSaveApplication(
+    account: string,
+    workspace: string,
+    input: ApplicationInput,
+    application: string | null
+  ): Promise<unknown> {
+    const result = await this.pool.query<{ directory: unknown }>(
+      "SELECT platform.shiplog_save_application($1,$2,$3,$4,$5,$6) AS directory",
+      [account, workspace, application, input.name, input.description, input.team_id]
+    );
+    return result.rows[0]!.directory;
+  }
+  async shiplogDeleteApplication(
+    account: string,
+    workspace: string,
+    application: string
+  ): Promise<unknown> {
+    const result = await this.pool.query<{ directory: unknown }>(
+      "SELECT platform.shiplog_delete_application($1,$2,$3) AS directory",
+      [account, workspace, application]
+    );
+    return result.rows[0]!.directory;
+  }
   readonly pool: Pool;
 
   constructor(connectionString: string) {

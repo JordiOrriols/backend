@@ -33,6 +33,20 @@ export interface PriorityProposal {
 }
 
 export class PlatformDatabase {
+  async laddersDeleteMember(account: string, workspace: string, member: string): Promise<unknown> {
+    const result = await this.pool.query<{ data: unknown }>(
+      "SELECT platform.ladders_delete_member($1,$2,$3) AS data",
+      [account, workspace, member]
+    );
+    return result.rows[0]!.data;
+  }
+  async laddersDeleteTeam(account: string, workspace: string, team: string): Promise<unknown> {
+    const result = await this.pool.query<{ data: unknown }>(
+      "SELECT platform.ladders_delete_team($1,$2,$3) AS data",
+      [account, workspace, team]
+    );
+    return result.rows[0]!.data;
+  }
   async laddersSaveProfile(
     account: string,
     workspace: string,

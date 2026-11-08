@@ -57,6 +57,22 @@ const database = new PlatformDatabase(required("DATABASE_URL"));
 
 @Controller("api")
 class PlatformController {
+  @Delete("ladders/workspaces/:workspace/members/:member")
+  async laddersDeleteMember(
+    @Headers("cf-access-jwt-assertion") token: string | undefined,
+    @Param("workspace", new ParseUUIDPipe()) workspace: string,
+    @Param("member", new ParseUUIDPipe()) member: string
+  ) {
+    return this.execute(token, (id) => database.laddersDeleteMember(id, workspace, member));
+  }
+  @Delete("ladders/workspaces/:workspace/teams/:team")
+  async laddersDeleteTeam(
+    @Headers("cf-access-jwt-assertion") token: string | undefined,
+    @Param("workspace", new ParseUUIDPipe()) workspace: string,
+    @Param("team", new ParseUUIDPipe()) team: string
+  ) {
+    return this.execute(token, (id) => database.laddersDeleteTeam(id, workspace, team));
+  }
   @Patch("ladders/workspaces/:workspace/members/:member")
   async laddersSaveProfile(
     @Headers("cf-access-jwt-assertion") token: string | undefined,

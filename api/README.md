@@ -17,7 +17,7 @@ team/member directory with team creation/renaming. Apply `sql/001-projections.sq
 `sql/010-planner-teams.sql`, `sql/011-shiplog-applications.sql` and
 `sql/012-shiplog-releases.sql`, `sql/013-shiplog-checklists.sql` and
 `sql/014-shiplog-decisions.sql`, `sql/015-shiplog-audit.sql` and
-`sql/016-ladders-teams.sql` and `sql/017-ladders-profiles.sql` to the isolated
+`sql/016-ladders-teams.sql` and `sql/017-ladders-profiles.sql` and `sql/018-ladders-deletion.sql` to the isolated
 database using its local Compose `exec db psql` command; never apply it to the
 production database. Fresh imports apply these API SQL files automatically.
 The API's workspace directory only lists explicit app/workspace grants.
@@ -35,7 +35,7 @@ Planner grants do not confer Ladders access; same-email subjects remain distinct
 The isolated Ladders worktree serves authenticated hash-free `/ladders/` routes
 through the local gateway on port 5320 (direct app port 5314). It reuses UI layout,
 language/footer and team-name dialogs without initializing old browser Supabase
-or password/anonymous flows. Evaluations, member creation/moves, goals, deletion and
+or password/anonymous flows. Evaluations, member creation/moves, goals and
 shared lifecycle remain pending; the draft is not a production replacement.
 
 Owners/editors update member profiles with
@@ -51,6 +51,19 @@ simulated to authorize these writes. Viewer/revoked/other-app grants cannot edit
 The UI reuses the assessment's extracted profile fields and existing planning-role/
 template controls. Updated planning roles feed Planner's shared roster while
 requiring a separate Planner grant to inspect that roster.
+
+Only Ladders workspace owners delete `.../members/:member` or `.../teams/:team`.
+Deletes lock the explicit grant and workspace and reject foreign/missing targets
+with 404. Member deletion keeps existing FK cascades for evaluations, SMART goals,
+member invitations and vacations; it does not delete linked accounts, other
+members or their records. Empty non-default teams can be deleted; default/nonempty
+teams return 409 with visible localized UI errors, without changing stored flags.
+Existing team integrity triggers stay enabled. Shiplog's existing team FK clears
+the association while retaining the application. The delete transaction clears
+`created_for_team` on that workspace to prevent the legacy last-team cleanup
+trigger from implicitly deleting platform grants/workspaces. Workspace deletion
+remains an explicit shared lifecycle operation, not a side effect of team deletion.
+The existing confirmation dialog is reused; cancellation never writes.
 
 Internal Shiplog grants can read `GET .../applications`, returning explicit
 application fields, an `in_use` flag and workspace team IDs/names. External

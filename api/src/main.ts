@@ -21,7 +21,12 @@ import {
 import { NestFactory } from "@nestjs/core";
 import { AccessVerifier } from "./access.js";
 import { APPLICATIONS, PlatformDatabase } from "./database.js";
-import { memberProfileInput, commentVisibilityInput } from "./ladders-input.js";
+import {
+  memberProfileInput,
+  commentVisibilityInput,
+  evaluationContentInput,
+  evaluationStatusInput,
+} from "./ladders-input.js";
 import { buildPublicRoadmap, hasHolidayCalendar, validateSprintSettings } from "./scheduler.mjs";
 import {
   applicationInput,
@@ -57,6 +62,53 @@ const database = new PlatformDatabase(required("DATABASE_URL"));
 
 @Controller("api")
 class PlatformController {
+  @Post("ladders/workspaces/:workspace/members/:member/evaluations")
+  async laddersCreateEvaluation(
+    @Headers("cf-access-jwt-assertion") token: string | undefined,
+    @Param("workspace", new ParseUUIDPipe()) workspace: string,
+    @Param("member", new ParseUUIDPipe()) member: string,
+    @Body() body: unknown
+  ) {
+    return this.execute(token, (id) =>
+      database.laddersSaveEvaluation(id, workspace, member, null, evaluationContentInput(body))
+    );
+  }
+  @Patch("ladders/workspaces/:workspace/members/:member/evaluations/:evaluation")
+  async laddersSaveEvaluation(
+    @Headers("cf-access-jwt-assertion") token: string | undefined,
+    @Param("workspace", new ParseUUIDPipe()) workspace: string,
+    @Param("member", new ParseUUIDPipe()) member: string,
+    @Param("evaluation", new ParseUUIDPipe()) evaluation: string,
+    @Body() body: unknown
+  ) {
+    return this.execute(token, (id) =>
+      database.laddersSaveEvaluation(
+        id,
+        workspace,
+        member,
+        evaluation,
+        evaluationContentInput(body)
+      )
+    );
+  }
+  @Patch("ladders/workspaces/:workspace/members/:member/evaluations/:evaluation/status")
+  async laddersEvaluationStatus(
+    @Headers("cf-access-jwt-assertion") token: string | undefined,
+    @Param("workspace", new ParseUUIDPipe()) workspace: string,
+    @Param("member", new ParseUUIDPipe()) member: string,
+    @Param("evaluation", new ParseUUIDPipe()) evaluation: string,
+    @Body() body: unknown
+  ) {
+    return this.execute(token, (id) =>
+      database.laddersEvaluationStatus(
+        id,
+        workspace,
+        member,
+        evaluation,
+        evaluationStatusInput(body)
+      )
+    );
+  }
   @Patch("ladders/workspaces/:workspace/members/:member/evaluations/:evaluation/comments/:category")
   async laddersCommentVisibility(
     @Headers("cf-access-jwt-assertion") token: string | undefined,

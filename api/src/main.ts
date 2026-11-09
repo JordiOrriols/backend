@@ -63,8 +63,121 @@ function required(name: string): string {
 const verifier = new AccessVerifier(required("ACCESS_ISSUER"), required("ACCESS_AUDIENCE"));
 const database = new PlatformDatabase(required("DATABASE_URL"));
 
+function workspaceApplication(value: string) {
+  const app = APPLICATIONS.find((app) => app === value);
+  if (!app) throw new BadRequestException("Unknown application");
+  return app;
+}
+function workspaceRole(body: unknown): "editor" | "viewer" | "external" {
+  if (
+    !body ||
+    typeof body !== "object" ||
+    !("role" in body) ||
+    (body.role !== "editor" && body.role !== "viewer" && body.role !== "external")
+  )
+    throw new BadRequestException("Invalid workspace role");
+  return body.role;
+}
+
 @Controller("api")
 class PlatformController {
+  @Post("workspaces")
+  async createWorkspace(
+    @Headers("cf-access-jwt-assertion") token: string | undefined,
+    @Body() body: unknown
+  ) {
+    return this.execute(token, (id) => database.createWorkspace(id, teamNameInput(body)));
+  }
+  @Delete("workspaces/:workspace")
+  async deleteWorkspace(
+    @Headers("cf-access-jwt-assertion") token: string | undefined,
+    @Param("workspace", new ParseUUIDPipe()) workspace: string
+  ) {
+    return this.execute(token, (id) => database.deleteWorkspace(id, workspace));
+  }
+  @Get("apps/:app/workspaces/:workspace/access")
+  async workspaceAccess(
+    @Headers("cf-access-jwt-assertion") token: string | undefined,
+    @Param("app") app: string,
+    @Param("workspace", new ParseUUIDPipe()) workspace: string
+  ) {
+    return this.execute(token, (id) =>
+      database.workspaceAccessManagement(id, workspace, workspaceApplication(app), "list")
+    );
+  }
+  @Post("apps/:app/workspaces/:workspace/invitations/recipients/:recipient")
+  async inviteWorkspaceAccount(
+    @Headers("cf-access-jwt-assertion") token: string | undefined,
+    @Param("app") app: string,
+    @Param("workspace", new ParseUUIDPipe()) workspace: string,
+    @Param("recipient", new ParseUUIDPipe()) recipient: string,
+    @Body() body: unknown
+  ) {
+    return this.execute(token, (id) =>
+      database.workspaceAccessManagement(
+        id,
+        workspace,
+        workspaceApplication(app),
+        "invite",
+        recipient,
+        workspaceRole(body)
+      )
+    );
+  }
+  @Patch("apps/:app/workspaces/:workspace/access/:recipient")
+  async updateWorkspaceAccount(
+    @Headers("cf-access-jwt-assertion") token: string | undefined,
+    @Param("app") app: string,
+    @Param("workspace", new ParseUUIDPipe()) workspace: string,
+    @Param("recipient", new ParseUUIDPipe()) recipient: string,
+    @Body() body: unknown
+  ) {
+    return this.execute(token, (id) =>
+      database.workspaceAccessManagement(
+        id,
+        workspace,
+        workspaceApplication(app),
+        "update",
+        recipient,
+        workspaceRole(body)
+      )
+    );
+  }
+  @Delete("apps/:app/workspaces/:workspace/access/:recipient")
+  async removeWorkspaceAccount(
+    @Headers("cf-access-jwt-assertion") token: string | undefined,
+    @Param("app") app: string,
+    @Param("workspace", new ParseUUIDPipe()) workspace: string,
+    @Param("recipient", new ParseUUIDPipe()) recipient: string
+  ) {
+    return this.execute(token, (id) =>
+      database.workspaceAccessManagement(
+        id,
+        workspace,
+        workspaceApplication(app),
+        "remove",
+        recipient
+      )
+    );
+  }
+  @Get("me/workspace-invitations")
+  async myWorkspaceInvitations(@Headers("cf-access-jwt-assertion") token: string | undefined) {
+    return this.execute(token, (id) => database.myWorkspaceInvitations(id));
+  }
+  @Post("me/workspace-invitations/:invitation/accept")
+  async acceptWorkspaceInvitation(
+    @Headers("cf-access-jwt-assertion") token: string | undefined,
+    @Param("invitation", new ParseUUIDPipe()) invitation: string
+  ) {
+    return this.execute(token, (id) => database.answerWorkspaceInvitation(id, invitation, true));
+  }
+  @Post("me/workspace-invitations/:invitation/decline")
+  async declineWorkspaceInvitation(
+    @Headers("cf-access-jwt-assertion") token: string | undefined,
+    @Param("invitation", new ParseUUIDPipe()) invitation: string
+  ) {
+    return this.execute(token, (id) => database.answerWorkspaceInvitation(id, invitation, false));
+  }
   @Get("ladders/workspaces/:workspace/members/:member/account-link")
   async laddersMemberAccountLink(
     @Headers("cf-access-jwt-assertion") token: string | undefined,

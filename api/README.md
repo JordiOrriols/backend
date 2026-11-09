@@ -2,8 +2,8 @@
 
 This isolated branch adds a NestJS/TypeScript API and plain PostgreSQL 17.
 It does not modify production workflows or publish packages.
-The Pulse/Agents adapters and shared workspace lifecycle
-are not migrated yet. Explicit legacy account mappings can be
+The Pulse/Agents adapters are not migrated yet. The shared workspace lifecycle
+API and its central management screen are implemented. Explicit legacy account mappings can be
 provisioned by the isolated administrator tool; they do not infer permissions.
 
 The Shiplog and Planner isolated worktrees implement reduced views
@@ -26,9 +26,56 @@ team/member directory with team creation/renaming. Apply `sql/001-projections.sq
 `sql/025-ladders-smart-goals.sql`, `sql/026-legacy-account-mapping.sql` and
 `sql/027-ladders-employee-view.sql`, `sql/028-ladders-self-evaluations.sql` and
 `sql/029-ladders-employee-goals.sql`, `sql/030-ladders-peer-assignments.sql` and
-`sql/031-ladders-member-invitations.sql` to the isolated
+`sql/031-ladders-member-invitations.sql` and `sql/032-workspace-lifecycle.sql` to the isolated
 database using its local Compose `exec db psql` command; never apply it to the
 production database. Fresh imports apply these API SQL files automatically.
+
+## Verified workspace lifecycle
+
+`POST /api/workspaces` creates a named workspace for a verified Access account,
+granting its creator owner access in all five apps. It does not create an
+`auth.users` row or infer a legacy mapping. New workspaces store an immutable
+`platform_owner_id` instead of a legacy owner, with exactly one ownership kind.
+Existing imported workspace/team/member owner IDs remain untouched. Nullable
+legacy owner IDs are permitted for teams/members only in a native workspace
+through the dedicated scoped API login; legacy team-owner guards remain active.
+Native workspaces initially contain no teams or content.
+
+App owners manage only their app through:
+
+- `GET /api/apps/:app/workspaces/:workspace/access`
+- `POST .../invitations/recipients/:recipient` with `{role}`
+- `PATCH .../access/:recipient` with `{role}`
+- `DELETE .../access/:recipient` to remove a grant and/or revoke a pending invite.
+
+Roles are editor/viewer, plus external only in Planner/Shiplog. Owner grants
+cannot be changed through this surface. Recipients must already have a verified
+platform account and accept explicitly using `GET /api/me/workspace-invitations`
+and `POST .../:invitation/accept` or `.../decline`. Same-email subjects cannot
+read or consume another account's invitation. Rotation, revocation, expiry
+(30 days), decline and one-use acceptance invalidate old IDs. Acceptance grants
+only the named app/role, never personal member ownership or other apps.
+All management responses contain explicit account IDs and roles, not email
+inference or legacy identity information.
+
+`DELETE /api/workspaces/:workspace` requires owner grants in all five apps.
+It locks grants and container rows, reuses the shared cross-app emptiness check
+and additionally protects platform Shiplog audits and Planner snapshots.
+Members, features, surveys, retrospectives, actions, tasks, applications and
+history prevent deletion with 409. Empty container teams/projects may be removed.
+Successful deletion removes grants/invitations but never deletes accounts.
+Concurrent active grant writes fail explicitly with a retryable 409 rather than
+forming a grant/workspace lock cycle.
+
+One six-language management screen at `/ladders/workspace-access` is linked from
+the migrated Ladders, Planner and Shiplog directories. It reuses UI package name
+dialogs, labels, fields, selectors, action handling and deletion confirmation.
+It supports create-or-wait onboarding, exact-account invitations, acceptance,
+role changes and removal. Pulse/Agents navigation will use this same surface
+when their adapters are migrated; no duplicate management UI is needed.
+
+## Member invitations
+
 Ladders owners/editors manage member account links with
 `GET/DELETE /api/ladders/workspaces/:workspace/members/:member/account-link`, invite an exact
 previously authenticated platform account with `POST .../invitations/recipients/:recipient`,
@@ -76,8 +123,7 @@ or password/anonymous flows. SMART goals reuse the existing member profile panel
 Owners/editors can create and edit goals, update progress, and append manager
 comments; viewers are read-only and only owners may delete. Scoped functions
 preserve legacy comment history, enforce append-only comments, reject foreign
-member/goal IDs and keep direct runtime table access denied. Shared lifecycle
-remains pending; the draft is not a production replacement.
+member/goal IDs and keep direct runtime table access denied. Corporate Access acceptance remains pending; the draft is not a production replacement.
 
 Owners/editors update member profiles with
 `PATCH /api/ladders/workspaces/:workspace/members/:member`, supplying explicit

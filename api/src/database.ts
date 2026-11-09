@@ -33,6 +33,52 @@ export interface PriorityProposal {
 }
 
 export class PlatformDatabase {
+  async createWorkspace(account: string, name: string): Promise<unknown> {
+    const result = await this.pool.query<{ data: unknown }>(
+      "SELECT platform.create_workspace($1,$2) AS data",
+      [account, name]
+    );
+    return result.rows[0]!.data;
+  }
+  async workspaceAccessManagement(
+    account: string,
+    workspace: string,
+    app: Application,
+    action: "list" | "invite" | "update" | "remove",
+    recipient: string | null = null,
+    role: string | null = null
+  ): Promise<unknown> {
+    const result = await this.pool.query<{ data: unknown }>(
+      "SELECT platform.workspace_access_management($1,$2,$3,$4,$5,$6) AS data",
+      [account, workspace, app, action, recipient, role]
+    );
+    return result.rows[0]!.data;
+  }
+  async myWorkspaceInvitations(account: string): Promise<unknown> {
+    const result = await this.pool.query<{ data: unknown }>(
+      "SELECT platform.my_workspace_invitations($1) AS data",
+      [account]
+    );
+    return result.rows[0]!.data;
+  }
+  async answerWorkspaceInvitation(
+    account: string,
+    invitation: string,
+    accept: boolean
+  ): Promise<unknown> {
+    const result = await this.pool.query<{ data: unknown }>(
+      "SELECT platform.answer_workspace_invitation($1,$2,$3) AS data",
+      [account, invitation, accept]
+    );
+    return result.rows[0]!.data;
+  }
+  async deleteWorkspace(account: string, workspace: string): Promise<unknown> {
+    const result = await this.pool.query<{ data: unknown }>(
+      "SELECT platform.delete_workspace($1,$2) AS data",
+      [account, workspace]
+    );
+    return result.rows[0]!.data;
+  }
   async laddersMemberInvitationManagement(
     account: string,
     workspace: string,

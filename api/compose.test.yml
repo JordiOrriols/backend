@@ -1,0 +1,22 @@
+services:
+  api:
+    environment:
+      NODE_ENV: development
+      ACCESS_ISSUER: http://access-fixture:3001
+      ACCESS_AUDIENCE: platform-local-test
+    depends_on:
+      access-fixture: { condition: service_started }
+  access-fixture:
+    build:
+      context: .
+      target: build
+      additional_contexts:
+        planner: ../../planner-access-local
+      secrets: [github_token]
+    environment:
+      NODE_ENV: development
+    volumes:
+      - ./test/access-fixture.mjs:/app/access-fixture.mjs:ro
+    command: ["node", "access-fixture.mjs"]
+    ports: ["127.0.0.1:5301:3001"]
+    networks: [edge]

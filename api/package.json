@@ -1,0 +1,36 @@
+{
+  "name": "@jordiorriols/platform-api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/main.js",
+    "test": "node --import tsx --test test/*.test.ts",
+    "test:integration": "node --import tsx --test test/integration/*.ts",
+    "db:import": "node --import tsx scripts/import-local.ts",
+    "permissions:local": "node --import tsx scripts/permissions-local.ts"
+  },
+  "dependencies": {
+    "@nestjs/common": "^11.2.8",
+    "@nestjs/core": "^11.2.8",
+    "@nestjs/platform-express": "^11.2.8",
+    "jose": "^6.1.0",
+    "pg": "^8.16.0",
+    "pg-copy-streams": "^7.0.0",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.2"
+  },
+  "overrides": {
+    "@nestjs/platform-express": {
+      "multer": "^2.5.0"
+    }
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "@types/pg": "^8.15.0",
+    "@types/pg-copy-streams": "^1.2.5",
+    "tsx": "^4.20.0",
+    "typescript": "^5.9.3"
+  }
+}

@@ -1,0 +1,841 @@
+import { Pool } from "pg";
+import type { AccessIdentity } from "./access.js";
+import type { MemberProfileInput, EvaluationContent, SmartGoalInput } from "./ladders-input.js";
+import type { ApplicationInput, ReleaseInput, ChecklistInput } from "./shiplog-input.js";
+import type { SurveyInput } from "./pulse-input.js";
+import type {
+  PriorityInput,
+  ProposalInput,
+  FeatureInput,
+  VacationInput,
+  CalibrationInput,
+  PlanningRole,
+} from "./planner-input.js";
+
+export const APPLICATIONS = ["planner", "shiplog", "ladders", "pulse", "agents"] as const;
+export type Application = (typeof APPLICATIONS)[number];
+
+export interface WorkspaceSummary {
+  id: string;
+  name: string;
+  role: string;
+}
+
+export interface PlatformAccount {
+  id: string;
+  email: string;
+  grants: { app: string; workspaceId: string; role: string }[];
+}
+
+export interface PriorityProposal {
+  id: string;
+  name: string;
+  created_at: string;
+}
+
+export class PlatformDatabase {
+  async pulseSurveys(account: string, workspace: string): Promise<unknown> {
+    const result = await this.pool.query<{ data: unknown }>(
+      "SELECT platform.pulse_surveys($1,$2) AS data",
+      [account, workspace]
+    );
+    return result.rows[0]!.data;
+  }
+  async pulseSurveyResults(account: string, workspace: string): Promise<unknown> {
+    const result = await this.pool.query<{ data: unknown }>(
+      "SELECT platform.pulse_survey_results($1,$2) AS data",
+      [account, workspace]
+    );
+    return result.rows[0]!.data;
+  }
+  async pulseCreateSurvey(
+    account: string,
+    workspace: string,
+    content: SurveyInput
+  ): Promise<unknown> {
+    const result = await this.pool.query<{ data: unknown }>(
+      "SELECT platform.pulse_create_survey($1,$2,$3) AS data",
+      [account, workspace, content]
+    );
+    return result.rows[0]!.data;
+  }
+  async pulseSubmitResponse(
+    account: string,
+    workspace: string,
+    survey: string,
+    ratings: Record<string, unknown>,
+    comment: string
+  ): Promise<unknown> {
+    const result = await this.pool.query<{ data: unknown }>(
+      "SELECT platform.pulse_submit_response($1,$2,$3,$4,$5) AS data",
+      [account, workspace, survey, ratings, comment]
+    );
+    return result.rows[0]!.data;
+  }
+  async pulseManageSurvey(
+    account: string,
+    workspace: string,
+    survey: string,
+    action: "open" | "closed" | "delete"
+  ): Promise<unknown> {
+    const result = await this.pool.query<{ data: unknown }>(
+      "SELECT platform.pulse_manage_survey($1,$2,$3,$4) AS data",
+      [account, workspace, survey, action]
+    );
+    return result.rows[0]!.data;
+  }
+  async createWorkspace(account: string, name: string): Promise<unknown> {
+    const result = await this.pool.query<{ data: unknown }>(
+      "SELECT platform.create_workspace($1,$2) AS data",
+      [account, name]
+    );
+    return result.rows[0]!.data;
+  }
+  async workspaceAccessManagement(
+    account: string,
+    workspace: string,
+    app: Application,
+    action: "list" | "invite" | "update" | "remove",
+    recipient: string | null = null,
+    role: string | null = null
+  ): Promise<unknown> {
+    const result = await this.pool.query<{ data: unknown }>(
+      "SELECT platform.workspace_access_management($1,$2,$3,$4,$5,$6) AS data",
+      [account, workspace, app, action, recipient, role]
+    );
+    return result.rows[0]!.data;
+  }
+  async myWorkspaceInvitations(account: string): Promise<unknown> {
+    const result = await this.pool.query<{ data: unknown }>(
+      "SELECT platform.my_workspace_invitations($1) AS data",
+      [account]
+    );
+    return result.rows[0]!.data;
+  }
+  async answerWorkspaceInvitation(
+    account: string,
+    invitation: string,
+    accept: boolean
+  ): Promise<unknown> {
+    const result = await this.pool.query<{ data: unknown }>(
+      "SELECT platform.answer_workspace_invitation($1,$2,$3) AS data",
+      [account, invitation, accept]
+    );
+    return result.rows[0]!.data;
+  }
+  async deleteWorkspace(account: string, workspace: string): Promise<unknown> {
+    const result = await this.pool.query<{ data: unknown }>(
+      "SELECT platform.delete_workspace($1,$2) AS data",
+      [account, workspace]
+    );
+    return result.rows[0]!.data;
+  }
+  async laddersMemberInvitationManagement(
+    account: string,
+    workspace: string,
+    member: string,
+    action: "get" | "invite" | "revoke" | "unlink",
+    recipient: string | null = null
+  ): Promise<unknown> {
+    const result = await this.pool.query<{ data: unknown }>(
+      "SELECT platform.ladders_member_invitation_management($1,$2,$3,$4,$5) AS data",
+      [account, workspace, member, action, recipient]
+    );
+    return result.rows[0]!.data;
+  }
+  async laddersMyMemberInvitations(account: string): Promise<unknown> {
+    const result = await this.pool.query<{ data: unknown }>(
+      "SELECT platform.ladders_my_member_invitations($1) AS data",
+      [account]
+    );
+    return result.rows[0]!.data;
+  }
+  async laddersAnswerMemberInvitation(
+    account: string,
+    invitation: string,
+    accept: boolean
+  ): Promise<unknown> {
+    const result = await this.pool.query<{ data: unknown }>(
+      "SELECT platform.ladders_answer_member_invitation($1,$2,$3) AS data",
+      [account, invitation, accept]
+    );
+    return result.rows[0]!.data;
+  }
+  async laddersPeerManagement(
+    account: string,
+    workspace: string,
+    member: string,
+    action: "list" | "candidates" | "assign" | "revoke",
+    target: string | null = null
+  ): Promise<unknown> {
+    const result = await this.pool.query<{ data: unknown }>(
+      "SELECT platform.ladders_peer_management($1,$2,$3,$4,$5) AS data",
+      [account, workspace, member, action, target]
+    );
+    return result.rows[0]!.data;
+  }
+  async laddersMyPeerAssignments(account: string): Promise<unknown> {
+    const result = await this.pool.query<{ data: unknown }>(
+      "SELECT platform.ladders_my_peer_assignments($1) AS data",
+      [account]
+    );
+    return result.rows[0]!.data;
+  }
+  async laddersSubmitPeer(
+    account: string,
+    assignment: string,
+    content: EvaluationContent
+  ): Promise<unknown> {
+    const result = await this.pool.query<{ data: unknown }>(
+      "SELECT platform.ladders_submit_peer($1,$2,$3) AS data",
+      [account, assignment, content]
+    );
+    return result.rows[0]!.data;
+  }
+  async laddersMyGoals(account: string, member: string): Promise<unknown> {
+    const result = await this.pool.query<{ data: unknown }>(
+      "SELECT platform.ladders_my_goals($1,$2) AS data",
+      [account, member]
+    );
+    return result.rows[0]!.data;
+  }
+  async laddersUpdateMyGoal(
+    account: string,
+    member: string,
+    goal: string,
+    progress: number | null,
+    comment: string | null
+  ): Promise<unknown> {
+    const result = await this.pool.query<{ data: unknown }>(
+      "SELECT platform.ladders_update_my_goal($1,$2,$3,$4::smallint,$5) AS data",
+      [account, member, goal, progress, comment]
+    );
+    return result.rows[0]!.data;
+  }
+  async laddersMySelfEvaluations(account: string, member: string): Promise<unknown> {
+    const result = await this.pool.query<{ data: unknown }>(
+      "SELECT platform.ladders_my_self_evaluations($1,$2) AS data",
+      [account, member]
+    );
+    return result.rows[0]!.data;
+  }
+  async laddersSaveMyEvaluation(
+    account: string,
+    member: string,
+    evaluation: string | null,
+    content: EvaluationContent
+  ): Promise<unknown> {
+    const result = await this.pool.query<{ data: unknown }>(
+      "SELECT platform.ladders_save_my_evaluation($1,$2,$3,$4) AS data",
+      [account, member, evaluation, content]
+    );
+    return result.rows[0]!.data;
+  }
+  async laddersPublishMyEvaluation(
+    account: string,
+    member: string,
+    evaluation: string
+  ): Promise<unknown> {
+    const result = await this.pool.query<{ data: unknown }>(
+      "SELECT platform.ladders_publish_my_evaluation($1,$2,$3) AS data",
+      [account, member, evaluation]
+    );
+    return result.rows[0]!.data;
+  }
+  async laddersMyMembers(account: string): Promise<unknown> {
+    const result = await this.pool.query<{ data: unknown }>(
+      "SELECT platform.ladders_my_members($1) AS data",
+      [account]
+    );
+    return result.rows[0]!.data;
+  }
+  async laddersMyEvaluations(account: string, member: string): Promise<unknown> {
+    const result = await this.pool.query<{ data: unknown }>(
+      "SELECT platform.ladders_my_evaluations($1,$2) AS data",
+      [account, member]
+    );
+    return result.rows[0]!.data;
+  }
+  async laddersSaveEvaluation(
+    account: string,
+    workspace: string,
+    member: string,
+    evaluation: string | null,
+    content: EvaluationContent
+  ): Promise<unknown> {
+    const result = await this.pool.query<{ data: unknown }>(
+      "SELECT platform.ladders_save_evaluation($1,$2,$3,$4,$5) AS data",
+      [account, workspace, member, evaluation, content]
+    );
+    return result.rows[0]!.data;
+  }
+  async laddersEvaluationStatus(
+    account: string,
+    workspace: string,
+    member: string,
+    evaluation: string,
+    status: "draft" | "published"
+  ): Promise<unknown> {
+    const result = await this.pool.query<{ data: unknown }>(
+      "SELECT platform.ladders_evaluation_status($1,$2,$3,$4,$5) AS data",
+      [account, workspace, member, evaluation, status]
+    );
+    return result.rows[0]!.data;
+  }
+  async laddersDeleteEvaluation(
+    account: string,
+    workspace: string,
+    member: string,
+    evaluation: string
+  ): Promise<unknown> {
+    const result = await this.pool.query<{ data: unknown }>(
+      "SELECT platform.ladders_delete_evaluation($1,$2,$3,$4) AS data",
+      [account, workspace, member, evaluation]
+    );
+    return result.rows[0]!.data;
+  }
+  async laddersGoals(account: string, workspace: string, member: string): Promise<unknown> {
+    const result = await this.pool.query<{ data: unknown }>(
+      "SELECT platform.ladders_goals($1,$2,$3) AS data",
+      [account, workspace, member]
+    );
+    return result.rows[0]!.data;
+  }
+  async laddersSaveGoal(
+    account: string,
+    workspace: string,
+    member: string,
+    goal: string | null,
+    input: SmartGoalInput
+  ): Promise<unknown> {
+    const result = await this.pool.query<{ data: unknown }>(
+      "SELECT platform.ladders_save_goal($1,$2,$3,$4,$5,$6,$7,$8) AS data",
+      [
+        account,
+        workspace,
+        member,
+        goal,
+        input.title,
+        input.description,
+        input.due_date,
+        input.progress,
+      ]
+    );
+    return result.rows[0]!.data;
+  }
+  async laddersAppendGoalComment(
+    account: string,
+    workspace: string,
+    member: string,
+    goal: string,
+    comment: string
+  ): Promise<unknown> {
+    const result = await this.pool.query<{ data: unknown }>(
+      "SELECT platform.ladders_append_goal_comment($1,$2,$3,$4,$5) AS data",
+      [account, workspace, member, goal, comment]
+    );
+    return result.rows[0]!.data;
+  }
+  async laddersDeleteGoal(
+    account: string,
+    workspace: string,
+    member: string,
+    goal: string
+  ): Promise<unknown> {
+    const result = await this.pool.query<{ data: unknown }>(
+      "SELECT platform.ladders_delete_goal($1,$2,$3,$4) AS data",
+      [account, workspace, member, goal]
+    );
+    return result.rows[0]!.data;
+  }
+  async laddersCommentVisibility(
+    account: string,
+    workspace: string,
+    member: string,
+    evaluation: string,
+    category: string,
+    visible: boolean
+  ): Promise<unknown> {
+    const result = await this.pool.query<{ data: unknown }>(
+      "SELECT platform.ladders_comment_visibility($1,$2,$3,$4,$5,$6) AS data",
+      [account, workspace, member, evaluation, category, visible]
+    );
+    return result.rows[0]!.data;
+  }
+  async laddersEvaluations(account: string, workspace: string, member: string): Promise<unknown> {
+    const result = await this.pool.query<{ data: unknown }>(
+      "SELECT platform.ladders_evaluations($1,$2,$3) AS data",
+      [account, workspace, member]
+    );
+    return result.rows[0]!.data;
+  }
+  async laddersMoveMember(
+    account: string,
+    workspace: string,
+    member: string,
+    team: string
+  ): Promise<unknown> {
+    const result = await this.pool.query<{ data: unknown }>(
+      "SELECT platform.ladders_move_member($1,$2,$3,$4) AS data",
+      [account, workspace, member, team]
+    );
+    return result.rows[0]!.data;
+  }
+  async laddersCreateMember(
+    account: string,
+    workspace: string,
+    team: string,
+    profile: MemberProfileInput
+  ): Promise<unknown> {
+    const result = await this.pool.query<{ data: unknown }>(
+      "SELECT platform.ladders_create_member($1,$2,$3,$4) AS data",
+      [account, workspace, team, profile]
+    );
+    return result.rows[0]!.data;
+  }
+  async laddersDeleteMember(account: string, workspace: string, member: string): Promise<unknown> {
+    const result = await this.pool.query<{ data: unknown }>(
+      "SELECT platform.ladders_delete_member($1,$2,$3) AS data",
+      [account, workspace, member]
+    );
+    return result.rows[0]!.data;
+  }
+  async laddersDeleteTeam(account: string, workspace: string, team: string): Promise<unknown> {
+    const result = await this.pool.query<{ data: unknown }>(
+      "SELECT platform.ladders_delete_team($1,$2,$3) AS data",
+      [account, workspace, team]
+    );
+    return result.rows[0]!.data;
+  }
+  async laddersSaveProfile(
+    account: string,
+    workspace: string,
+    member: string,
+    profile: MemberProfileInput
+  ): Promise<unknown> {
+    const result = await this.pool.query<{ data: unknown }>(
+      "SELECT platform.ladders_save_profile($1,$2,$3,$4) AS data",
+      [account, workspace, member, profile]
+    );
+    return result.rows[0]!.data;
+  }
+  async laddersTeams(account: string, workspace: string): Promise<unknown> {
+    const result = await this.pool.query<{ data: unknown }>(
+      "SELECT platform.ladders_teams($1,$2) AS data",
+      [account, workspace]
+    );
+    return result.rows[0]!.data;
+  }
+  async laddersSaveTeam(
+    account: string,
+    workspace: string,
+    name: string,
+    team: string | null
+  ): Promise<unknown> {
+    const result = await this.pool.query<{ data: unknown }>(
+      "SELECT platform.ladders_save_team($1,$2,$3,$4) AS data",
+      [account, workspace, name, team]
+    );
+    return result.rows[0]!.data;
+  }
+  async shiplogAudit(
+    account: string,
+    workspace: string,
+    cursor: { source: "platform" | "legacy"; id: string } | null
+  ): Promise<unknown> {
+    const result = await this.pool.query<{ data: unknown }>(
+      "SELECT platform.shiplog_audit($1,$2,$3,$4) AS data",
+      [account, workspace, cursor?.source ?? null, cursor?.id ?? null]
+    );
+    return result.rows[0]!.data;
+  }
+  async shiplogDecisions(account: string, workspace: string, release: string): Promise<unknown> {
+    const result = await this.pool.query<{ data: unknown }>(
+      "SELECT platform.shiplog_decisions($1,$2,$3) AS data",
+      [account, workspace, release]
+    );
+    return result.rows[0]!.data;
+  }
+  async shiplogDecideRelease(
+    account: string,
+    workspace: string,
+    release: string,
+    approved: boolean
+  ): Promise<unknown> {
+    const result = await this.pool.query<{ data: unknown }>(
+      "SELECT platform.shiplog_decide_release($1,$2,$3,$4) AS data",
+      [account, workspace, release, approved]
+    );
+    return result.rows[0]!.data;
+  }
+  async shiplogChecklistTemplate(
+    account: string,
+    workspace: string,
+    application: string
+  ): Promise<unknown> {
+    const result = await this.pool.query<{ data: unknown }>(
+      "SELECT platform.shiplog_checklist_template($1,$2,$3) AS data",
+      [account, workspace, application]
+    );
+    return result.rows[0]!.data;
+  }
+  async shiplogSaveChecklistTemplate(
+    account: string,
+    workspace: string,
+    application: string,
+    input: ChecklistInput
+  ): Promise<unknown> {
+    const result = await this.pool.query<{ data: unknown }>(
+      "SELECT platform.shiplog_save_checklist_template($1,$2,$3,$4) AS data",
+      [account, workspace, application, input]
+    );
+    return result.rows[0]!.data;
+  }
+  async shiplogReadiness(account: string, workspace: string, release: string): Promise<unknown> {
+    const result = await this.pool.query<{ data: unknown }>(
+      "SELECT platform.shiplog_readiness($1,$2,$3) AS data",
+      [account, workspace, release]
+    );
+    return result.rows[0]!.data;
+  }
+  async shiplogCompleteChecklistItem(
+    account: string,
+    workspace: string,
+    release: string,
+    item: string,
+    completed: boolean
+  ): Promise<unknown> {
+    const result = await this.pool.query<{ data: unknown }>(
+      "SELECT platform.shiplog_complete_checklist_item($1,$2,$3,$4,$5) AS data",
+      [account, workspace, release, item, completed]
+    );
+    return result.rows[0]!.data;
+  }
+  async shiplogReleaseFeatures(
+    account: string,
+    workspace: string,
+    release: string
+  ): Promise<unknown> {
+    const result = await this.pool.query<{ features: unknown }>(
+      "SELECT platform.shiplog_release_features($1,$2,$3) AS features",
+      [account, workspace, release]
+    );
+    return result.rows[0]!.features;
+  }
+  async shiplogWorkspaceFeatures(account: string, workspace: string): Promise<unknown> {
+    const result = await this.pool.query<{ features: unknown }>(
+      "SELECT platform.shiplog_workspace_features($1,$2) AS features",
+      [account, workspace]
+    );
+    return result.rows[0]!.features;
+  }
+  async shiplogSaveRelease(
+    account: string,
+    workspace: string,
+    input: ReleaseInput,
+    release: string | null
+  ): Promise<unknown> {
+    const { feature_ids, ...fields } = input;
+    const result = await this.pool.query<{ release: unknown }>(
+      "SELECT platform.shiplog_save_release($1,$2,$3,$4,$5) AS release",
+      [account, workspace, release, fields, feature_ids]
+    );
+    return result.rows[0]!.release;
+  }
+  async shiplogApplications(account: string, workspace: string): Promise<unknown> {
+    const result = await this.pool.query<{ directory: unknown }>(
+      "SELECT platform.shiplog_applications($1,$2) AS directory",
+      [account, workspace]
+    );
+    return result.rows[0]!.directory;
+  }
+  async shiplogSaveApplication(
+    account: string,
+    workspace: string,
+    input: ApplicationInput,
+    application: string | null
+  ): Promise<unknown> {
+    const result = await this.pool.query<{ directory: unknown }>(
+      "SELECT platform.shiplog_save_application($1,$2,$3,$4,$5,$6) AS directory",
+      [account, workspace, application, input.name, input.description, input.team_id]
+    );
+    return result.rows[0]!.directory;
+  }
+  async shiplogDeleteApplication(
+    account: string,
+    workspace: string,
+    application: string
+  ): Promise<unknown> {
+    const result = await this.pool.query<{ directory: unknown }>(
+      "SELECT platform.shiplog_delete_application($1,$2,$3) AS directory",
+      [account, workspace, application]
+    );
+    return result.rows[0]!.directory;
+  }
+  readonly pool: Pool;
+
+  constructor(connectionString: string) {
+    this.pool = new Pool({ connectionString });
+  }
+
+  async workspaces(accountId: string, app: Application): Promise<WorkspaceSummary[]> {
+    const result = await this.pool.query<WorkspaceSummary>(
+      "SELECT * FROM platform.workspace_directory($1,$2)",
+      [accountId, app]
+    );
+    return result.rows;
+  }
+
+  async shiplogCatalog(accountId: string, workspaceId: string): Promise<unknown> {
+    const result = await this.pool.query<{ catalog: unknown }>(
+      "SELECT platform.shiplog_catalog($1,$2) AS catalog",
+      [accountId, workspaceId]
+    );
+    return result.rows[0]!.catalog;
+  }
+
+  async plannerSource(accountId: string, workspaceId: string): Promise<unknown> {
+    const result = await this.pool.query<{ source: unknown }>(
+      "SELECT platform.planner_source($1,$2) AS source",
+      [accountId, workspaceId]
+    );
+    return result.rows[0]!.source;
+  }
+
+  async plannerPreview(
+    accountId: string,
+    workspaceId: string,
+    input: PriorityInput
+  ): Promise<unknown> {
+    const result = await this.pool.query<{ source: unknown }>(
+      "SELECT platform.planner_preview($1,$2,$3,$4) AS source",
+      [accountId, workspaceId, input.featureIds, input.expectedRevision]
+    );
+    return result.rows[0]!.source;
+  }
+
+  async plannerApplyPriorities(
+    accountId: string,
+    workspaceId: string,
+    input: PriorityInput
+  ): Promise<unknown> {
+    const result = await this.pool.query<{ source: unknown }>(
+      "SELECT platform.planner_apply_priorities($1,$2,$3,$4) AS source",
+      [accountId, workspaceId, input.featureIds, input.expectedRevision]
+    );
+    return result.rows[0]!.source;
+  }
+
+  async plannerProposals(accountId: string, workspaceId: string): Promise<PriorityProposal[]> {
+    const result = await this.pool.query<{ id: string; name: string; created_at: Date }>(
+      "SELECT id,name,created_at FROM platform.planner_proposals($1,$2)",
+      [accountId, workspaceId]
+    );
+    return result.rows.map((row) => ({ ...row, created_at: row.created_at.toISOString() }));
+  }
+
+  async plannerSavedProposal(
+    accountId: string,
+    workspaceId: string,
+    proposalId: string
+  ): Promise<unknown> {
+    const result = await this.pool.query<{ source: unknown }>(
+      "SELECT platform.planner_saved_proposal($1,$2,$3) AS source",
+      [accountId, workspaceId, proposalId]
+    );
+    return result.rows[0]!.source;
+  }
+
+  async plannerSaveProposal(
+    accountId: string,
+    workspaceId: string,
+    input: ProposalInput
+  ): Promise<string> {
+    const result = await this.pool.query<{ id: string }>(
+      "SELECT platform.planner_save_proposal($1,$2,$3,$4,$5) AS id",
+      [accountId, workspaceId, input.name, input.featureIds, input.expectedRevision]
+    );
+    return result.rows[0]!.id;
+  }
+
+  async plannerMarkers(accountId: string, workspaceId: string): Promise<unknown> {
+    const result = await this.pool.query<{ markers: unknown }>(
+      "SELECT platform.planner_markers($1,$2) AS markers",
+      [accountId, workspaceId]
+    );
+    return result.rows[0]!.markers;
+  }
+
+  async plannerProjects(accountId: string, workspaceId: string): Promise<unknown> {
+    const result = await this.pool.query<{ projects: unknown }>(
+      "SELECT platform.planner_projects($1,$2) AS projects",
+      [accountId, workspaceId]
+    );
+    return result.rows[0]!.projects;
+  }
+
+  async plannerFeatures(accountId: string, workspaceId: string): Promise<unknown> {
+    const result = await this.pool.query<{ features: unknown }>(
+      "SELECT platform.planner_features($1,$2) AS features",
+      [accountId, workspaceId]
+    );
+    return result.rows[0]!.features;
+  }
+
+  async plannerCalendar(accountId: string, workspaceId: string): Promise<unknown> {
+    const result = await this.pool.query<{ calendar: unknown }>(
+      "SELECT platform.planner_calendar($1,$2) AS calendar",
+      [accountId, workspaceId]
+    );
+    return result.rows[0]!.calendar;
+  }
+
+  async plannerCreateTeam(accountId: string, workspaceId: string, name: string): Promise<unknown> {
+    const result = await this.pool.query<{ calendar: unknown }>(
+      "SELECT platform.planner_create_team($1,$2,$3) AS calendar",
+      [accountId, workspaceId, name]
+    );
+    return result.rows[0]!.calendar;
+  }
+
+  async plannerPlanningRole(
+    accountId: string,
+    workspaceId: string,
+    memberId: string,
+    role: PlanningRole | null
+  ): Promise<unknown> {
+    const result = await this.pool.query<{ calendar: unknown }>(
+      "SELECT platform.planner_planning_role($1,$2,$3,$4) AS calendar",
+      [accountId, workspaceId, memberId, role]
+    );
+    return result.rows[0]!.calendar;
+  }
+
+  async plannerVacations(
+    accountId: string,
+    workspaceId: string,
+    memberId: string,
+    input: VacationInput
+  ): Promise<unknown> {
+    const result = await this.pool.query<{ calendar: unknown }>(
+      "SELECT platform.planner_vacations($1,$2,$3,$4,$5,$6) AS calendar",
+      [accountId, workspaceId, memberId, input.start, input.end, input.working]
+    );
+    return result.rows[0]!.calendar;
+  }
+
+  async plannerCalibration(
+    accountId: string,
+    workspaceId: string,
+    input: CalibrationInput
+  ): Promise<unknown> {
+    const result = await this.pool.query<{ calendar: unknown }>(
+      "SELECT platform.planner_calibration($1,$2,$3,$4) AS calendar",
+      [accountId, workspaceId, input.anchor, JSON.stringify(input.history)]
+    );
+    return result.rows[0]!.calendar;
+  }
+
+  async plannerToggleBacklog(
+    accountId: string,
+    workspaceId: string,
+    featureId: string,
+    included: boolean
+  ): Promise<unknown> {
+    const result = await this.pool.query<{ feature: unknown }>(
+      "SELECT platform.planner_toggle_backlog($1,$2,$3,$4) AS feature",
+      [accountId, workspaceId, featureId, included]
+    );
+    return result.rows[0]!.feature;
+  }
+
+  async plannerStartDate(accountId: string, workspaceId: string, date: string): Promise<unknown> {
+    const result = await this.pool.query<{ source: unknown }>(
+      "SELECT platform.planner_start_date($1,$2,$3) AS source",
+      [accountId, workspaceId, date]
+    );
+    return result.rows[0]!.source;
+  }
+
+  async plannerFeature(
+    accountId: string,
+    workspaceId: string,
+    action: "create" | "save" | "delete",
+    featureId: string | null,
+    input: FeatureInput | null
+  ): Promise<unknown> {
+    const result = await this.pool.query<{ feature: unknown }>(
+      "SELECT platform.planner_feature($1,$2,$3,$4,$5) AS feature",
+      [accountId, workspaceId, action, featureId, input]
+    );
+    return result.rows[0]!.feature;
+  }
+
+  async plannerProject(
+    accountId: string,
+    workspaceId: string,
+    action: "create" | "rename" | "delete",
+    projectId: string | null,
+    name: string | null
+  ): Promise<unknown> {
+    const result = await this.pool.query<{ project: unknown }>(
+      "SELECT platform.planner_project($1,$2,$3,$4,$5) AS project",
+      [accountId, workspaceId, action, projectId, name]
+    );
+    return result.rows[0]!.project;
+  }
+
+  async plannerMarker(
+    accountId: string,
+    workspaceId: string,
+    action: "create" | "rename" | "delete",
+    markerId: string | null,
+    name: string | null,
+    date: string | null
+  ): Promise<unknown> {
+    const result = await this.pool.query<{ marker: unknown }>(
+      "SELECT platform.planner_marker($1,$2,$3,$4,$5,$6) AS marker",
+      [accountId, workspaceId, action, markerId, name, date]
+    );
+    return result.rows[0]!.marker;
+  }
+
+  async account(identity: AccessIdentity): Promise<PlatformAccount> {
+    const client = await this.pool.connect();
+    try {
+      await client.query("BEGIN");
+      await client.query("SELECT pg_advisory_xact_lock(hashtextextended($1,0))", [
+        JSON.stringify([identity.issuer, identity.subject]),
+      ]);
+      let { rows } = await client.query<{ id: string }>(
+        "SELECT user_id AS id FROM platform.identities WHERE issuer=$1 AND subject=$2",
+        [identity.issuer, identity.subject]
+      );
+      let id = rows[0]?.id;
+      if (!id) {
+        const created = await client.query<{ id: string }>(
+          "INSERT INTO platform.users(email) VALUES($1) RETURNING id",
+          [identity.email]
+        );
+        id = created.rows[0]!.id;
+        await client.query(
+          "INSERT INTO platform.identities(issuer,subject,user_id) VALUES($1,$2,$3)",
+          [identity.issuer, identity.subject, id]
+        );
+      } else {
+        await client.query("UPDATE platform.users SET email=$2 WHERE id=$1", [id, identity.email]);
+      }
+      const grants = await client.query<PlatformAccount["grants"][number]>(
+        'SELECT app, workspace_id AS "workspaceId", role FROM platform.grants WHERE user_id=$1 ORDER BY app,workspace_id',
+        [id]
+      );
+      await client.query("COMMIT");
+      return { id, email: identity.email, grants: grants.rows };
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+}

@@ -1,0 +1,682 @@
+# Local platform API migration
+
+This isolated branch adds a NestJS/TypeScript API and plain PostgreSQL 17.
+It does not modify production workflows or publish packages.
+Pulse surveys are migrated; its retrospectives/actions/overview and the Agents adapter
+remain pending. The shared workspace lifecycle
+API and its central management screen are implemented. Explicit legacy account mappings can be
+provisioned by the isolated administrator tool; they do not infer permissions.
+
+The Shiplog and Planner isolated worktrees implement reduced views
+at `/shiplog/workspaces/:workspace/releases` and
+`/planner/workspaces/:workspace/roadmap`, with the Planner editing operations
+described below. Shiplog primary workflows are API-backed, and Ladders now has a
+team/member directory with team creation/renaming. Apply `sql/001-projections.sql` and
+`sql/002-planner-source.sql`, `sql/003-planner-proposals.sql` and
+`sql/004-planner-markers.sql`, `sql/005-planner-priorities.sql` and
+`sql/006-planner-projects.sql`, `sql/007-planner-features.sql` and
+`sql/008-planner-roadmap-settings.sql`, `sql/009-planner-calendar.sql`,
+`sql/010-planner-teams.sql`, `sql/011-shiplog-applications.sql` and
+`sql/012-shiplog-releases.sql`, `sql/013-shiplog-checklists.sql` and
+`sql/014-shiplog-decisions.sql`, `sql/015-shiplog-audit.sql` and
+`sql/016-ladders-teams.sql` and `sql/017-ladders-profiles.sql`, `sql/018-ladders-deletion.sql` and
+`sql/019-ladders-members.sql`, `sql/020-ladders-member-moves.sql` and
+`sql/021-ladders-evaluation-history.sql`, `sql/022-ladders-comment-visibility.sql` and
+`sql/023-ladders-evaluation-editing.sql`,
+`sql/024-ladders-evaluation-deletion.sql` and
+`sql/025-ladders-smart-goals.sql`, `sql/026-legacy-account-mapping.sql` and
+`sql/027-ladders-employee-view.sql`, `sql/028-ladders-self-evaluations.sql` and
+`sql/029-ladders-employee-goals.sql`, `sql/030-ladders-peer-assignments.sql` and
+`sql/031-ladders-member-invitations.sql`, `sql/032-workspace-lifecycle.sql` and
+`sql/033-pulse-surveys.sql` to the isolated
+database using its local Compose `exec db psql` command; never apply it to the
+production database. Fresh imports apply these API SQL files automatically.
+
+## Pulse anonymous surveys
+
+The `/pulse/` Access frontend reuses its existing survey view, dialogs, hook and
+report calculations. It links the shared workspace lifecycle screen rather than
+duplicating it. Local app/gateway ports are 5316/5320. The runtime has no legacy
+authentication initialization. Retrospectives, actions and overview remain pending.
+
+- `GET /api/pulse/workspaces/:workspace/surveys` returns questions and only the
+  caller's answered marker, never participant lists or response identities.
+- `GET .../survey-results` returns counts. Rating distributions and separate,
+  alphabetically ordered comments require closed status and the minimum responses.
+- `POST .../surveys` requires owner/editor and bounded title/questions/options.
+- `POST .../surveys/:survey/responses` requires Pulse owner/editor/viewer access,
+  open status and an exact complete map of 1–5 ratings. Concurrent submissions
+  consume one separate participation marker, with no account/time on responses
+  and no response linkage on comments.
+- `PATCH .../surveys/:survey` with `{status}` closes/reopens; `DELETE` removes the
+  survey, answers, comments and participation markers. Both require owner/editor.
+
+All operations check explicit app/workspace grants and reject foreign survey IDs.
+Existing explicitly mapped legacy participation prevents answering twice. New
+answers by mapped identities also mark the real legacy account's participation
+without manufacturing accounts or attaching that identity to anonymous answers.
+Runtime SQL cannot read response/comment/participation tables or call the internal
+authorization helper directly. Survey mutations serialize against workspace and
+survey deletion; API roles are rechecked on every request.
+The schema is local-only; normal clean image builds need registry credentials
+provided as a BuildKit secret, not source links or committed tokens.
+
+## Verified workspace lifecycle
+
+`POST /api/workspaces` creates a named workspace for a verified Access account,
+granting its creator owner access in all five apps. It does not create an
+`auth.users` row or infer a legacy mapping. New workspaces store an immutable
+`platform_owner_id` instead of a legacy owner, with exactly one ownership kind.
+Existing imported workspace/team/member owner IDs remain untouched. Nullable
+legacy owner IDs are permitted for teams/members only in a native workspace
+through the dedicated scoped API login; legacy team-owner guards remain active.
+Native workspaces initially contain no teams or content.
+
+App owners manage only their app through:
+
+- `GET /api/apps/:app/workspaces/:workspace/access`
+- `POST .../invitations/recipients/:recipient` with `{role}`
+- `PATCH .../access/:recipient` with `{role}`
+- `DELETE .../access/:recipient` to remove a grant and/or revoke a pending invite.
+
+Roles are editor/viewer, plus external only in Planner/Shiplog. Owner grants
+cannot be changed through this surface. Recipients must already have a verified
+platform account and accept explicitly using `GET /api/me/workspace-invitations`
+and `POST .../:invitation/accept` or `.../decline`. Same-email subjects cannot
+read or consume another account's invitation. Rotation, revocation, expiry
+(30 days), decline and one-use acceptance invalidate old IDs. Acceptance grants
+only the named app/role, never personal member ownership or other apps.
+All management responses contain explicit account IDs and roles, not email
+inference or legacy identity information.
+
+`DELETE /api/workspaces/:workspace` requires owner grants in all five apps.
+It locks grants and container rows, reuses the shared cross-app emptiness check
+and additionally protects platform Shiplog audits and Planner snapshots.
+Members, features, surveys, retrospectives, actions, tasks, applications and
+history prevent deletion with 409. Empty container teams/projects may be removed.
+Successful deletion removes grants/invitations but never deletes accounts.
+Concurrent active grant writes fail explicitly with a retryable 409 rather than
+forming a grant/workspace lock cycle.
+
+One six-language management screen at `/ladders/workspace-access` is linked from
+the migrated Ladders, Planner and Shiplog directories. It reuses UI package name
+dialogs, labels, fields, selectors, action handling and deletion confirmation.
+It supports create-or-wait onboarding, exact-account invitations, acceptance,
+role changes and removal. Pulse/Agents navigation will use this same surface
+when their adapters are migrated; no duplicate management UI is needed.
+
+## Member invitations
+
+Ladders owners/editors manage member account links with
+`GET/DELETE /api/ladders/workspaces/:workspace/members/:member/account-link`, invite an exact
+previously authenticated platform account with `POST .../invitations/recipients/:recipient`,
+and revoke with `DELETE .../invitations`. The manager sees linked/pending booleans,
+not account/legacy identifiers or bearer tokens. Recipients find invitations at
+`GET /api/ladders/me/member-invitations` and explicitly `POST .../:invitation/accept`
+or `.../decline`. Only the exact verified account can read/answer; same email is
+irrelevant. Invites expire after 30 days, rotation invalidates the old ID and
+acceptance/decline consumes the invite. Concurrent acceptance links once.
+
+Acceptance creates an explicit platform-member association, never a legacy
+account, legacy mapping, simulated login or workspace/app grant. Existing legacy
+member links continue through explicit administrator mappings. A shared account
+resolver covers personal history, self writes, goal progress/comments and peer
+candidates/submissions for both link types. One account cannot link twice in a
+team; account/workspace/member locks serialize acceptance, and integrity triggers
+also prevent duplicate-team moves and conflicting legacy mappings. Unlink removes
+personal access and revokes reviews assigned to that member, preserving independent
+workspace grants, evaluation history and goal records. New invitations and unlink
+also invalidate old legacy member invitations. New Access accounts need no legacy
+identity mapping. No automatic Planner/Pulse shares are created.
+The API's workspace directory only lists explicit app/workspace grants.
+Catalog responses reuse the existing reduced release projection, without
+private engineering notes, audit entries or token settings.
+
+Ladders goals use scoped `GET/POST /api/ladders/workspaces/:workspace/members/:member/goals`,
+`PATCH/DELETE .../goals/:goal`, and `POST .../goals/:goal/comments` routes.
+Owners/editors can create, edit, track progress and append manager comments;
+viewers can read and only owners can delete. Definer functions lock the explicit
+grant and workspace/member scope, preserve immutable comment history, and deny
+direct access to the legacy table for the runtime API role.
+
+Ladders internal grants read `GET /api/ladders/workspaces/:workspace/teams`.
+The response contains team IDs/names and member IDs/team IDs/names/roles/planning
+roles/template IDs, never legacy owner/account IDs, personal tokens, evaluations or comments.
+Only owners create with `POST .../teams`; owners/editors rename with
+`PATCH .../teams/:team`. Shared name validation enforces 1-120 trimmed characters.
+Writes lock the explicit Ladders grant and workspace and reject foreign team IDs.
+Legacy workspace-owner FKs remain storage metadata, not verified identity links.
+Planner grants do not confer Ladders access; same-email subjects remain distinct.
+The isolated Ladders worktree serves authenticated hash-free `/ladders/` routes
+through the local gateway on port 5320 (direct app port 5314). It reuses UI layout,
+language/footer and team-name dialogs without initializing old browser Supabase
+or password/anonymous flows. SMART goals reuse the existing member profile panel.
+Owners/editors can create and edit goals, update progress, and append manager
+comments; viewers are read-only and only owners may delete. Scoped functions
+preserve legacy comment history, enforce append-only comments, reject foreign
+member/goal IDs and keep direct runtime table access denied. Corporate Access acceptance remains pending; the draft is not a production replacement.
+
+Owners/editors update member profiles with
+`PATCH /api/ladders/workspaces/:workspace/members/:member`, supplying explicit
+`name`, `role`, `planning_role` and `template_id` fields. The API whitelists fields
+and reuses the shared planning-role validator. Names/job roles are bounded to
+120 Unicode characters; legacy template IDs retain the existing 10-character
+limit and nullable roles/templates can be cleared. Grant/workspace/member locks
+serialize writes, and cross-workspace/missing members return 404. Existing member
+integrity triggers remain intact: ownership, team, tokens, account links and
+creation times are never mutated, nor is evaluation history. No legacy login is
+simulated to authorize these writes. Viewer/revoked/other-app grants cannot edit.
+The UI reuses the assessment's extracted profile fields and existing planning-role/
+template controls. Updated planning roles feed Planner's shared roster while
+requiring a separate Planner grant to inspect that roster.
+
+Only Ladders workspace owners delete `.../members/:member` or `.../teams/:team`.
+Deletes lock the explicit grant and workspace and reject foreign/missing targets
+with 404. Member deletion keeps existing FK cascades for evaluations, SMART goals,
+member invitations and vacations; it does not delete linked accounts, other
+members or their records. Empty non-default teams can be deleted; default/nonempty
+teams return 409 with visible localized UI errors, without changing stored flags.
+Existing team integrity triggers stay enabled. Shiplog's existing team FK clears
+the association while retaining the application. The delete transaction clears
+`created_for_team` on that workspace to prevent the legacy last-team cleanup
+trigger from implicitly deleting platform grants/workspaces. Workspace deletion
+remains an explicit shared lifecycle operation, not a side effect of team deletion.
+The existing confirmation dialog is reused; cancellation never writes.
+
+Owners/editors create members with
+`POST /api/ladders/workspaces/:workspace/teams/:team/members` using the same
+profile fields. The function locks the grant/workspace/team, rejects foreign
+teams and reuses `ladders_save_profile` validation in the same transaction.
+Invalid profiles leave no partial member. Response is `{id}` only.
+The insert trigger retains legacy authorization for all other database logins.
+For the dedicated `platform_api` login, which has no direct member INSERT
+privilege, authorization belongs to the narrow grant-scoped definer function;
+the trigger still requires an explicit team and generates ownership metadata,
+private tokens and an unlinked account exactly as before. This uses PostgreSQL
+`session_user`, not a caller-controlled setting, and does not simulate a legacy
+JWT. Direct runtime INSERT and unauthenticated legacy inserts remain denied.
+Member creation is not account mapping, invitation acceptance or token access.
+
+Owners/editors move existing members with
+`PATCH /api/ladders/workspaces/:workspace/members/:member/teams/:team` (no body).
+The grant/workspace/member/destination locks enforce same-workspace scope;
+missing or foreign members/teams return 404. Legacy cross-owner moves remain
+forbidden. The update trigger retains immutable IDs, owner, share tokens and
+invite-only linking rules. As with creation, only the dedicated `platform_api`
+login delegates legacy team authorization to the scoped definer function;
+direct runtime UPDATE is denied, while ordinary legacy owner moves still work
+and unauthenticated legacy moves remain denied. No JWT identity is simulated.
+Moves preserve linked accounts, full profiles, evaluations, goals, invitations
+and vacations. The existing linked-account-per-team unique constraint yields
+409 without clearing either link or partially moving a member. Moving to the
+current team returns the roster without changing its timestamp. The frontend
+reuses UI's accessible team selector, saves explicitly and keeps its member URL.
+
+Verified Ladders employees use `GET /api/ladders/me/members` and
+`GET /api/ladders/me/members/:member/evaluations`. Access requires an explicit
+explicit direct member link, or an administrator-provisioned legacy mapping
+with the existing legacy member account link;
+email or workspace owner/editor/viewer grants never infer personal ownership.
+The directory returns only linked member profiles and their workspace names.
+The history returns own self drafts/published self evaluations and published
+manager/peer versions, newest-first. Private reviewer drafts, legacy account IDs,
+tokens and visibility metadata never leave the server. Hidden comment text is
+removed in SQL: peer comments default hidden, others default visible, with explicit
+per-comment overrides. Unlinking (or unmapping a legacy-linked member) revokes employee reads on the next request;
+missing/foreign members return 404. These reads do not create workspace grants
+or permit employee writes. The shared viewer/layout/languages/footer are reused.
+
+Linked employees edit their own self evaluations using
+`GET/POST /api/ladders/me/members/:member/self-evaluations`,
+`PATCH .../self-evaluations/:evaluation` and `POST .../:evaluation/publish`.
+The separate self-only projection returns the employee's own answers, including
+comments hidden in the mixed history projection, without reviewer versions or
+visibility metadata. Content writes whitelist levels/comments through the existing
+validator; identity, author, kind, status and visibility cannot be supplied.
+The server derives author name from the linked profile and creates drafts only.
+Only own self drafts update; published content stays immutable, and new answers
+create a new draft rather than replacing published history. Member-row locking
+serializes draft creation; mapping locks serialize writes with unmapping.
+Workspace manager/owner grants confer no personal write access.
+The frontend reuses the existing manager editor's extracted rendering and shared
+autosave hook, hides manager-only goal/visibility controls and never enables
+profile changes, deletion or unpublishing. Failed autosaves remain visible.
+
+Employees read their own goals using `GET /api/ladders/me/members/:member/goals`.
+`PATCH .../goals/:goal/progress` accepts only an integer progress of 0-100;
+`POST .../goals/:goal/comments` appends text with server-generated identity/time
+and `authorKind: member`. Neither route changes title, description, due date,
+membership, previous comments or ownership. Existing legacy comments survive.
+The same mapping/member locks serialize updates and concurrent comment appends.
+Foreign goals/members and unlinked accounts are denied, independently of any
+workspace grant. Employees cannot create or delete goals. The existing member
+mode of `SmartGoalsPanel` is reused for progress and comments, with no new form.
+
+Owners/editors manage authenticated peer reviews with
+`GET .../members/:member/peer-candidates`, `GET .../peer-assignments`,
+`POST .../peer-assignments/reviewers/:reviewer` (the reviewer's member UUID), and
+`DELETE .../peer-assignments/:assignment`. Candidates are already-linked,
+verified colleagues in the same workspace, through direct or legacy-mapped links, never email matches.
+Self review and duplicate pending assignments are rejected. The manager projection
+contains assignment ID, reviewer display name and submitted/revoked flags only.
+Reviewers use `GET /api/ladders/me/peer-assignments` and
+`POST .../:assignment/submit`. They receive the target profile but no evaluation
+history, workspace directory access, account IDs or tokens. Mapping/link/workspace
+scope is rechecked on reads and writes. Unmapping, moving out of the workspace
+or revocation denies submission. Each assignment permits one submission, including
+under concurrent requests; it remains completed if the evaluation is later deleted.
+The server derives authorship from the reviewer's linked member, forces peer/draft,
+empty goal levels and default-hidden comment visibility, ignoring caller identities.
+Existing manager moderation and per-comment visibility publish/share the result.
+Revoking an assignment never deletes submitted feedback. The shared assessment
+editor is reused without history or name input; anonymous peer routes stay disabled.
+
+Internal Ladders owner/editor/viewer grants read
+`GET /api/ladders/workspaces/:workspace/members/:member/evaluations`.
+The explicit projection returns evaluation ID/member ID/kind/status/author name,
+current and goal levels, comments, comment-visibility metadata and creation date,
+ordered newest-first with ID tie-breaking. All self drafts remain excluded,
+including for managers, as in legacy team RLS. Manager/peer drafts and hidden
+comments remain available to internal reviewers; this is not an employee-safe
+read endpoint. No legacy owner/account/share-token fields are included. Missing
+or foreign members return 404, unrelated app grants/same-email subjects and
+revoked access confer no permission. Runtime direct evaluation SELECT is denied.
+Reads do not mutate imported history or enable status/deletion/content edits.
+The frontend reuses the existing history/compare/competency/comment/template
+components and strictly validates member IDs, kinds, statuses, dates and
+half-step competency levels before rendering.
+
+Owners/editors share or hide a saved competency comment with
+`PATCH /api/ladders/workspaces/:workspace/members/:member/evaluations/:evaluation/comments/:category`
+and `{visible: boolean}`. The API whitelists an explicit boolean; SQL validates
+the category and existing nonblank comment. Grant/workspace/evaluation locks
+enforce complete scope, exclude private self drafts and reject missing/foreign
+evaluations with 404. Viewer/revoked grants return 403 and invalid input 400.
+Writes change only `comment_visibility` and return the same scoped history.
+Manager/published-self/peer comments are independently controlled; peers start
+hidden, and approving a draft peer comment does not publish its version.
+Runtime direct UPDATE is denied; legacy evaluation integrity triggers remain
+enabled and content/status/identity/timestamps are unchanged. Integration
+verifies the existing legacy employee projection redacts hidden notes on the
+server and respects per-category peer approval. That projection is not exposed
+through anonymous API routes; authenticated employee reads apply these same
+redaction rules through explicit identity mappings.
+The frontend extracts the existing assessment control into one shared panel,
+retaining legacy behavior, translated labels/errors and autosave busy gating.
+
+Owners/editors create manager drafts with `POST .../members/:member/evaluations`
+and update manager draft content with `PATCH .../evaluations/:evaluation`.
+Only `current_levels`, `goal_levels` and `comments` are accepted. Shared legacy
+validators enforce the five competencies, 0-5.5 half-step levels and at most
+2000 Unicode characters per comment. Grant/workspace/member locks serialize
+draft writes. New versions are always manager drafts with no claimed legacy
+author identity; they copy the latest manager visibility metadata server-side.
+Caller-supplied kind/status/author/identity/visibility fields cannot alter this.
+An existing manager draft prevents a duplicate (409); published content cannot
+be edited (409), and self/peer/foreign content targets are unavailable (404).
+Updates retain draft identity, creation date and visibility.
+`PATCH .../evaluations/:evaluation/status` accepts `{status:'draft'|'published'}`
+only for manager/peer versions. Self status remains employee-owned. Returning a
+manager version to draft rejects another existing manager draft. Peer publication
+never approves its comments implicitly. Existing evaluation integrity triggers
+stay enabled; runtime direct INSERT/UPDATE is denied. Responses use the explicit
+history projection. The frontend reuses the existing queued 500ms autosave hook,
+assessment form and version panel through a typed store; no legacy auth/database
+adapter is initialized. Authenticated self evaluation editing uses the separate
+member-scoped routes described above; peer submissions use explicit assignments.
+
+Only owners delete evaluations with
+`DELETE .../members/:member/evaluations/:evaluation`. The function locks the
+explicit owner grant, workspace and target evaluation, and verifies the member
+and evaluation belong to that workspace. Editors/viewers, foreign or missing
+targets are denied. Published self evaluations can be deleted by the owner, but
+self drafts remain private and return 404 even when their ID is known. The
+response is the refreshed internal history; runtime direct table deletion stays
+denied. The existing version-panel confirmation and permission check are reused.
+
+Internal Shiplog grants can read `GET .../applications`, returning explicit
+application fields, an `in_use` flag and workspace team IDs/names. External
+grants retain only the reduced catalog. Owners/editors can create (`POST`),
+edit (`PATCH .../applications/:id`) and delete (`DELETE .../applications/:id`).
+Names/descriptions/team IDs are validated; cross-workspace teams or application
+IDs are rejected. Any release prevents application deletion. Writes lock the
+grant, workspace and existing application; updates preserve identity/timestamps.
+Audit events are stored separately under `platform.shiplog_audit_events`,
+with the verified platform account as actor. They never impersonate or link
+legacy accounts. The runtime cannot read/write that audit table directly.
+The existing application form/cards are reused.
+
+Shiplog owners/editors create releases with `POST .../releases` and save
+configuration with `PATCH .../releases/:id`. The existing release form is shared
+with the legacy adapter. Version/type detection reuses the existing PostgreSQL
+SemVer implementation, excluding the edited release; application versions remain
+unique. Drafts allow version/title/feature editing; notes and manual status remain
+editable in every status, matching the existing independent QA/approval behavior.
+`feature_ids: null` preserves links, while an array replaces them atomically with
+the release fields and status. Link changes and `GET .../features` require an
+additional internal Planner grant in the same workspace. Cross-workspace features
+are rejected and existing linked names remain snapshots. Internal Shiplog users
+read linked IDs/names through `GET .../releases/:id/features`; external users retain
+only name-only catalog content. Writes lock grants/workspace/application/release
+and audit the verified platform actor. New releases leave the legacy `created_by`
+FK unset, rather than impersonating an old account, and retain the existing
+checklist snapshot trigger.
+
+Internal Shiplog grants read application checklist templates and release
+readiness through `GET .../applications/:id/checklist-template` and
+`GET .../releases/:id/readiness`. Only owners save templates with `PATCH`,
+providing the current revision and at most 100 validated item definitions.
+Stale revisions return 409; reload before saving. The existing release creation
+trigger snapshots templates, so edits affect only future releases.
+Owners/editors complete or clear checks through
+`PATCH .../releases/:id/checklist/:item` with `{ completed: boolean }`.
+Release/item/workspace boundaries are enforced under locks. QA completion does
+not change manual release status. Verified platform completion actors are stored
+separately in `platform.shiplog_checklist_completions`, never written into legacy
+actor FKs. Reads preserve imported completion unless explicitly changed; repeated
+completion preserves the original completion actor/time. All writes audit the
+platform actor. Viewers inspect QA without writing; external grants cannot read
+templates/readiness. Existing template, QA modal and checklist views are shared
+with legacy adapters.
+
+Internal Shiplog users read `GET .../releases/:id/decisions` and record their own
+decision through `PATCH .../releases/:id/decision` with `{ approved: boolean }`.
+Viewers can decide, matching the existing independent-member approval behavior,
+but still cannot edit releases/templates/checks. Decisions are independent of
+manual status and QA. Caller identity is always taken from the verified Access
+account, never from request fields. Grant/workspace/release locks serialize writes.
+The response includes the caller account ID and only active internal grant
+participants, with IDs, email-local-part display names, decisions and dates;
+full emails and legacy member metadata are not projected. Same-email subjects
+retain distinct platform IDs. Revoked/external participants disappear from the
+directory, while their stored decisions/audit remain.
+Platform decisions live separately in `platform.shiplog_release_decisions`.
+Imported legacy approvals remain untouched and are not attributed to Access
+users without explicit account mapping; mapped member display names also remain
+pending that separate step. Existing thumbs controls and QA placement are reused.
+Internal Shiplog grants read `GET .../audit`, which merges platform and imported
+legacy events in newest-first order. Each event explicitly identifies its source;
+legacy actor UUIDs are never presented as verified platform accounts. Platform
+display names omit full email addresses. Event details retain stored snapshots,
+including application deletion history. External users cannot read the history.
+Responses contain at most 50 events and `next_cursor: string | null`; pass the
+returned `cursor` query parameter for the next page. Cursors are workspace-scoped
+source/UUID pairs, ordered by timestamp/source/ID to avoid gaps on timestamp ties.
+Missing/deleted/foreign cursor events return 404, malformed cursors return 400.
+The runtime cannot mutate either audit ledger directly. The localized read-only
+history page is linked from internal workspace, application and release navigation.
+Shiplog primary workflows are now API-backed; shared lifecycle, explicit legacy
+identity mapping and real corporate Access acceptance still remain.
+
+The API Docker build uses the `planner` additional build context and a BuildKit
+GitHub token secret to compile Planner's existing scheduler. The runtime image
+contains only the bundled scheduler, without browser translations/auth hooks
+or source duplication. Server scheduling uses its own English translation
+instance and returns only the reduced roadmap projection.
+
+Planner priority experiments now run entirely through the authenticated API:
+`POST /api/planner/workspaces/:workspace/preview` accepts `featureIds` and
+`expectedRevision`, recalculates the existing scheduler and never writes
+official features. `POST .../proposals` adds a `name` and saves a separate
+snapshot. `GET .../proposals` lists names/IDs/dates; `GET .../proposals/:id`
+returns only the reduced roadmap. Every operation requires explicit Planner
+workspace access, including external users; a Shiplog grant is insufficient.
+The API reuses the existing database priority/dependency validation, preserves
+the completed/in-progress prefix and rejects stale revisions.
+Snapshots are shared only within that workspace's authorized Planner audience.
+Technical scheduler inputs in snapshots remain unreadable to the API database
+role and are never serialized to the browser. Previewing and saving never apply
+priorities to the official plan. Legacy share-token
+snapshots remain in the imported legacy table until a reviewed migration is
+implemented; they are not automatically exposed through new workspace grants.
+
+Marker management is also API-backed. Internal Planner owner/editor/viewer
+grants can list `GET .../markers`; only owners/editors can create (`POST`),
+rename (`PATCH .../markers/:id`) or delete (`DELETE .../markers/:id`).
+Renaming changes only the name, preserving marker ID, workspace and date.
+External users see the reduced name/date projection in the roadmap, never the
+internal marker directory or edit controls. Writes are workspace-scoped,
+validate names and calendar dates, and update the official roadmap revision.
+Saved proposal snapshots remain unchanged when markers are edited.
+
+Owners/editors can explicitly apply a reviewed experiment using
+`POST /api/planner/workspaces/:workspace/priorities` with `featureIds` and
+`expectedRevision`. The frontend requires a separate confirmation. To apply a
+saved proposal, first try its priorities on the current plan: saved dates and
+revisions are not copied into the official plan.
+The write holds the matching grant and workspace locks, reuses the existing
+preview/dependency checks, and updates only roadmap features' priorities.
+Completed/in-progress work and its prefix stay locked. Backlog features,
+estimates, names, statuses, vacations, markers and saved snapshots are unchanged.
+Stale or invalid requests fail without partial writes; concurrent differing
+orders from the same revision cannot both succeed. The response is the newly
+scheduled reduced official roadmap, not raw scheduler inputs.
+External/viewer users, wrong-app/workspace grants and revoked accounts cannot
+perform this operation. The runtime role still cannot directly update features.
+Vacation editing and capacity/planning configuration remain pending.
+
+Project management reuses the existing Planner modal. Internal grants can list
+`GET .../projects`; owners/editors can create (`POST`), rename
+(`PATCH .../projects/:id`) and delete (`DELETE .../projects/:id`).
+The directory returns only ID, workspace, name and an `in_use` flag. Names are
+trimmed and validated to 1-80 characters. All writes are workspace-scoped and
+hold the workspace lock. Deleting a project containing any feature, including
+off-roadmap backlog tasks, returns 409 without deleting anything. The modal
+disables that delete action. Wrong-workspace/missing IDs return 404; external
+users cannot read this directory. Renaming preserves ID and feature membership.
+
+Internal Planner grants can read `GET .../features`, including backlog,
+descriptions and estimates; external grants cannot. Owners/editors can create
+(`POST`), edit (`PATCH .../features/:id`) and delete (`DELETE .../features/:id`).
+The existing estimation view, cards and feature modal are reused by both the
+legacy page and the authenticated API page. Names, project IDs, statuses,
+whole-number estimates and role pairs are validated before writes.
+New tasks start outside the roadmap; editing cannot change inclusion, priority,
+ID or creation time. Moving a task to another project in the same workspace is
+allowed, but cross-workspace projects and task IDs are rejected.
+Writes hold the grant and workspace locks and reuse the existing dependency
+constraints. Self/unknown/cross-workspace dependencies, cycles, invalid roadmap
+dependency ordering, and deleting a prerequisite are rejected atomically.
+Only explicitly projected task fields are returned; the API role still cannot
+read or write the legacy feature table directly. Task edits refresh the current
+roadmap, while saved proposal snapshots are untouched.
+
+Roadmap inclusion/removal uses `PATCH .../features/:id/inclusion` with an exact
+boolean `included`. Only owners/editors can write. Inclusion appends to the
+current roadmap under the workspace lock; repeat inclusion preserves priority.
+Existing dependency validation rejects adding a dependant before its
+prerequisite or removing a prerequisite while its dependant remains included.
+Changing `PATCH .../start-date` with `date` also requires owner/editor access.
+The API validates real dates and imports the verified-calendar predicate from
+the existing Planner scheduler bundle instead of duplicating calendar years.
+It returns the recalculated reduced roadmap; task fields and proposal snapshots
+remain unchanged.
+
+Internal grants can read `GET .../calendar`: workspace teams, a minimal member
+roster, vacations and sprint settings. It excludes vacation/share tokens,
+account emails and evaluation records; external grants cannot read it.
+Owners/editors can save ranges using
+`POST .../members/:member/vacations` with `{start,end,working}`. Dates must be
+real, in the verified calendar and span at most 366 days inclusive.
+The member must belong to a team in that workspace. `working: true` removes
+nonworking vacation rows, restoring normal weekends/holidays without creating
+working overrides. There is no implicit self-edit or legacy member linking
+by email: edit permission comes from the workspace owner/editor grant.
+
+`PATCH .../calibration` accepts `{anchor,history}` for owners/editors.
+Structural validation precedes the actual Planner sprint validator exported
+in the scheduler bundle, preserving its calendar, alignment, uniqueness and
+nonnegative-point rules. Writes lock the grant/workspace and preserve proposal
+snapshots. The authenticated vacation route reuses the existing calendar,
+timeline, capacity forecast and calibration modal.
+Planner owners can create teams using `POST .../teams` with `{name}` (trimmed,
+1–120 characters). Editors cannot add teams, preserving the existing owner-only
+behavior. Owners/editors can change or clear a member's planning role through
+`PATCH .../members/:member/planning-role` with `{role}`: backend, frontend,
+design, qa or explicit null. The member must belong to this workspace.
+Only the planning role changes, not job titles, identity links or share tokens.
+Writes lock the grant/workspace, refresh capacity/roadmap inputs and preserve
+proposal snapshots. The existing team configuration view is shared with the
+legacy adapter; the API version has no copy-vacation-link action.
+During compatibility migration, new teams retain the workspace's legacy
+storage-owner foreign key. This is not an identity link or a legacy permission
+grant for the Access caller. Authorization uses platform grants only.
+Reviewed member identity mapping remains pending; no anonymous member vacation
+links are active in this branch.
+
+Root `npm test` runs the legacy migration tests only. The separate API package
+uses Node's test runner via `npm --prefix api test`; CI installs and compiles
+that package independently. CI does not import backups or run remote tests.
+
+## Local Docker
+
+Create an owner-readable, gitignored `.env` in this directory:
+
+```dotenv
+LOCAL_DB_PASSWORD=<random hex password>
+LOCAL_API_DB_PASSWORD=<different random hex password>
+LOCAL_BACKUP_DIR=<absolute directory containing roles.sql, schema.sql, data.sql and SHA256SUMS>
+ACCESS_ISSUER=https://<team>.cloudflareaccess.com
+ACCESS_AUDIENCE=<Access application audience>
+```
+
+```sh
+docker compose --env-file .env -f compose.local.yml up -d db
+docker compose --env-file .env -f compose.local.yml run --rm import
+docker compose --env-file .env -f compose.local.yml run --rm integration
+docker compose --env-file .env -f compose.local.yml up -d api
+```
+
+If the default Docker socket is unavailable, use `docker --context desktop-linux`.
+No database port is published. The API is exposed only on `127.0.0.1:5300`.
+The importer refuses a nonlocal database or an existing schema, verifies backup
+checksums, restores application data transactionally and validates foreign keys.
+It imports only legacy account IDs, emails, confirmation dates and metadata:
+passwords, sessions, OAuth secrets and Supabase-managed storage are excluded.
+Legacy `auth.users`/`auth.uid()` are temporary PostgreSQL compatibility objects
+for existing functions, not an authentication service.
+Storage object bytes, if used, need a separate migration.
+
+The backup and imported volume contain personal data. Do not commit, upload or
+use them in public previews. The Compose volume persists until explicitly removed.
+
+## Identity and permissions
+
+`GET /api/me` verifies `Cf-Access-Jwt-Assertion` using Cloudflare's rotating JWKS,
+expected issuer, audience, RS256 signature, expiry and required user claims.
+The API never accepts an email header as authentication.
+Unknown issuer/subject pairs create a user with **no grants**.
+Email is metadata and never automatically links an existing account.
+Permission assignment uses the local administrator command described below.
+
+Grants are scoped to app/workspace. `external` is allowed only for Planner and
+Shiplog and will expose their reduced former shared-link projections, not private
+records. Both reduced projection endpoints are implemented.
+The API database role cannot read legacy app/account tables or assign permissions.
+There are no password, registration, recovery or anonymous endpoints.
+The production Docker image runs as a nonroot user and contains no dev tooling.
+
+### Local administrator command
+
+The user must first authenticate with Access (`GET /api/me`). Review the user's
+platform UUID **and verified issuer/subject**, not just their email: identical
+emails never imply identical accounts. This tool does not create identities
+or change imported application records.
+
+Run the separate tools-profile container against the isolated database:
+
+```sh
+docker compose --env-file .env -f compose.local.yml build permissions
+docker compose --env-file .env -f compose.local.yml run --rm permissions users
+docker compose --env-file .env -f compose.local.yml run --rm permissions workspaces
+docker compose --env-file .env -f compose.local.yml run --rm permissions grants
+docker compose --env-file .env -f compose.local.yml run --rm permissions legacy-users
+docker compose --env-file .env -f compose.local.yml run --rm permissions mappings
+docker compose --env-file .env -f compose.local.yml run --rm permissions map-legacy <platform-user-uuid> <legacy-user-uuid>
+docker compose --env-file .env -f compose.local.yml run --rm permissions unmap-legacy <platform-user-uuid> <legacy-user-uuid>
+docker compose --env-file .env -f compose.local.yml run --rm permissions grant <platform-user-uuid> planner <workspace-uuid> external
+docker compose --env-file .env -f compose.local.yml run --rm permissions revoke <platform-user-uuid> planner <workspace-uuid>
+```
+
+Export `GITHUB_TOKEN` for the build, as for the other images. Output from `users`
+contains identity metadata and must remain private.
+The `legacy-users` output is also private. Review exact IDs and the verified
+issuer/subject out of band before mapping; an email address is not proof of
+ownership. No command searches or matches identities by email.
+
+Legacy mappings are one-to-one and administrator-only. Repeating the same pair
+is idempotent and preserves its creation date; conflicting pairs fail instead
+of being reassigned. Unmapping requires both exact IDs. Mapping never creates
+grants, changes legacy owner/member FKs, or merges verified subjects; unmapping
+never revokes independently provisioned workspace grants. The runtime role and
+legacy browser roles cannot read or modify the mapping table, and `/api/me`
+does not expose it. Employee reads, self evaluation edits and goal progress/comments
+consume the mapping only when an existing member-account link also matches.
+Member invitation acceptance and a production mapping procedure remain pending.
+
+Apps: `planner`, `shiplog`, `ladders`, `pulse`, `agents`.
+Roles: `owner`, `editor`, `viewer`, `external` (last only for Planner/Shiplog).
+Granting an existing app/workspace replaces its role; revocation affects only
+the specified account/app/workspace. Missing accounts, workspaces and grants
+fail explicitly. Owner/editor grants unlock only the Planner editing operations
+described above; other internal workflows remain unported.
+
+Only this separate local tools container uses the administrator connection.
+The HTTP API role still cannot assign or revoke grants, and no administrator
+endpoint or public identity directory is added. The command requires
+`LOCAL_PERMISSIONS_CONFIRM=local-only` and refuses any database target other
+than `db:5432/platform`, including connection-string host overrides.
+It is not a production administration tool.
+
+## Validation
+
+```sh
+npm ci
+npm run build
+npm test
+```
+
+Integration tests run against the isolated Docker database only, create their own
+identities and clean up only their own platform rows. Existing E2E configs still
+use remote Supabase; do not run them as migration validation until a separate
+local-only config and API-backed app adapters are in place.
+
+The separate `platform-local.config.ts` in the isolated E2E worktree verifies
+the new API and reduced app views. Start its local signed-token fixture with:
+
+```sh
+docker compose --env-file .env -f compose.local.yml -f compose.test.yml up -d api access-fixture
+```
+
+Then run `npx playwright test --config=platform-local.config.ts` from the
+isolated E2E repository. This config has no production targets or remote auth
+setup. The issuer/signing fixture is local-only, publishes only a loopback port,
+and is not copied into the runtime Docker image. Real Cloudflare verification
+uses the standard Compose configuration, not this test override.
+
+To test the built frontend as well, export the registry `GITHUB_TOKEN` in your
+shell and run:
+
+```sh
+docker compose --env-file .env -f compose.local.yml build permissions
+docker compose --env-file .env -f compose.local.yml -f compose.test.yml --profile web up -d --build api planner shiplog ladders pulse gateway access-fixture
+```
+
+Run `PLATFORM_DOCKER_WEB=1 npx playwright test --config=platform-local.config.ts`
+from the isolated E2E worktree. That test uses the loopback web container at
+`http://127.0.0.1:5320/`, rejects nonlocal browser requests and checks
+deep-route reloads, missing authentication and permission revocation.
+Stop the `access-fixture` service after the checks and recreate `api` with only
+`compose.local.yml` to restore real Access issuer/audience verification.
+
+The gateway provides the single-origin layout for migrated apps. To start the
+complete local test stack, explicitly include the test override in every
+Compose command (omitting it resets the API to normal Access configuration):
+
+```sh
+docker compose --env-file .env -f compose.local.yml -f compose.test.yml --profile web up -d --build api planner shiplog ladders pulse gateway access-fixture
+```
+
+After recreating the API container, restart the local Nginx web/gateway services
+so their upstream hostname resolutions point to the new container.
+Do not use the local signed-token fixture in any external environment.

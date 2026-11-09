@@ -1,6 +1,17 @@
 import { BadRequestException } from "@nestjs/common";
 import { planningRoleInput, type PlanningRole } from "./planner-input.js";
 
+export function commentVisibilityInput(body: unknown): boolean {
+  if (
+    !body ||
+    typeof body !== "object" ||
+    !("visible" in body) ||
+    typeof body.visible !== "boolean"
+  )
+    throw new BadRequestException("Choose an existing competency comment");
+  return body.visible;
+}
+
 export interface MemberProfileInput {
   name: string;
   role: string;

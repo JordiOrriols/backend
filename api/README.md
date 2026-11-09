@@ -19,7 +19,7 @@ team/member directory with team creation/renaming. Apply `sql/001-projections.sq
 `sql/014-shiplog-decisions.sql`, `sql/015-shiplog-audit.sql` and
 `sql/016-ladders-teams.sql` and `sql/017-ladders-profiles.sql`, `sql/018-ladders-deletion.sql` and
 `sql/019-ladders-members.sql`, `sql/020-ladders-member-moves.sql` and
-`sql/021-ladders-evaluation-history.sql` to the isolated
+`sql/021-ladders-evaluation-history.sql` and `sql/022-ladders-comment-visibility.sql` to the isolated
 database using its local Compose `exec db psql` command; never apply it to the
 production database. Fresh imports apply these API SQL files automatically.
 The API's workspace directory only lists explicit app/workspace grants.
@@ -110,6 +110,23 @@ Reads do not mutate imported history or enable status/deletion/content edits.
 The frontend reuses the existing history/compare/competency/comment/template
 components and strictly validates member IDs, kinds, statuses, dates and
 half-step competency levels before rendering.
+
+Owners/editors share or hide a saved competency comment with
+`PATCH /api/ladders/workspaces/:workspace/members/:member/evaluations/:evaluation/comments/:category`
+and `{visible: boolean}`. The API whitelists an explicit boolean; SQL validates
+the category and existing nonblank comment. Grant/workspace/evaluation locks
+enforce complete scope, exclude private self drafts and reject missing/foreign
+evaluations with 404. Viewer/revoked grants return 403 and invalid input 400.
+Writes change only `comment_visibility` and return the same scoped history.
+Manager/published-self/peer comments are independently controlled; peers start
+hidden, and approving a draft peer comment does not publish its version.
+Runtime direct UPDATE is denied; legacy evaluation integrity triggers remain
+enabled and content/status/identity/timestamps are unchanged. Integration
+verifies the existing legacy employee projection redacts hidden notes on the
+server and respects per-category peer approval. That projection is not exposed
+through anonymous API routes; authenticated employee mapping/access is pending.
+The frontend extracts the existing assessment control into one shared panel,
+retaining legacy behavior, translated labels/errors and autosave busy gating.
 
 Internal Shiplog grants can read `GET .../applications`, returning explicit
 application fields, an `in_use` flag and workspace team IDs/names. External

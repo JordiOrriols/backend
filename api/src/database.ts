@@ -33,6 +33,20 @@ export interface PriorityProposal {
 }
 
 export class PlatformDatabase {
+  async laddersCommentVisibility(
+    account: string,
+    workspace: string,
+    member: string,
+    evaluation: string,
+    category: string,
+    visible: boolean
+  ): Promise<unknown> {
+    const result = await this.pool.query<{ data: unknown }>(
+      "SELECT platform.ladders_comment_visibility($1,$2,$3,$4,$5,$6) AS data",
+      [account, workspace, member, evaluation, category, visible]
+    );
+    return result.rows[0]!.data;
+  }
   async laddersEvaluations(account: string, workspace: string, member: string): Promise<unknown> {
     const result = await this.pool.query<{ data: unknown }>(
       "SELECT platform.ladders_evaluations($1,$2,$3) AS data",

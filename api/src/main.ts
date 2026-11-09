@@ -21,7 +21,7 @@ import {
 import { NestFactory } from "@nestjs/core";
 import { AccessVerifier } from "./access.js";
 import { APPLICATIONS, PlatformDatabase } from "./database.js";
-import { memberProfileInput } from "./ladders-input.js";
+import { memberProfileInput, commentVisibilityInput } from "./ladders-input.js";
 import { buildPublicRoadmap, hasHolidayCalendar, validateSprintSettings } from "./scheduler.mjs";
 import {
   applicationInput,
@@ -57,6 +57,26 @@ const database = new PlatformDatabase(required("DATABASE_URL"));
 
 @Controller("api")
 class PlatformController {
+  @Patch("ladders/workspaces/:workspace/members/:member/evaluations/:evaluation/comments/:category")
+  async laddersCommentVisibility(
+    @Headers("cf-access-jwt-assertion") token: string | undefined,
+    @Param("workspace", new ParseUUIDPipe()) workspace: string,
+    @Param("member", new ParseUUIDPipe()) member: string,
+    @Param("evaluation", new ParseUUIDPipe()) evaluation: string,
+    @Param("category") category: string,
+    @Body() body: unknown
+  ) {
+    return this.execute(token, (id) =>
+      database.laddersCommentVisibility(
+        id,
+        workspace,
+        member,
+        evaluation,
+        category,
+        commentVisibilityInput(body)
+      )
+    );
+  }
   @Get("ladders/workspaces/:workspace/members/:member/evaluations")
   async laddersEvaluations(
     @Headers("cf-access-jwt-assertion") token: string | undefined,

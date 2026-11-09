@@ -1,6 +1,13 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { memberProfileInput } from "../src/ladders-input.js";
+import { memberProfileInput, commentVisibilityInput } from "../src/ladders-input.js";
+
+test("comment visibility requires an explicit boolean and ignores injected fields", () => {
+  assert.equal(commentVisibilityInput({ visible: true, user_id: "spoof" }), true);
+  assert.equal(commentVisibilityInput({ visible: false }), false);
+  for (const body of [null, [], {}, { visible: "true" }, { visible: 1 }, { visible: null }])
+    assert.throws(() => commentVisibilityInput(body));
+});
 
 test("member profiles validate complete fields and Unicode limits while ignoring identities and tokens", () => {
   const input = {

@@ -33,6 +33,20 @@ export interface PriorityProposal {
 }
 
 export class PlatformDatabase {
+  async laddersMyMembers(account: string): Promise<unknown> {
+    const result = await this.pool.query<{ data: unknown }>(
+      "SELECT platform.ladders_my_members($1) AS data",
+      [account]
+    );
+    return result.rows[0]!.data;
+  }
+  async laddersMyEvaluations(account: string, member: string): Promise<unknown> {
+    const result = await this.pool.query<{ data: unknown }>(
+      "SELECT platform.ladders_my_evaluations($1,$2) AS data",
+      [account, member]
+    );
+    return result.rows[0]!.data;
+  }
   async laddersSaveEvaluation(
     account: string,
     workspace: string,

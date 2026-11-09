@@ -2,7 +2,7 @@
 
 This isolated branch adds a NestJS/TypeScript API and plain PostgreSQL 17.
 It does not modify production workflows or publish packages.
-The Pulse/Agents adapters, shared workspace lifecycle and employee-scoped
+The Pulse/Agents adapters, shared workspace lifecycle and employee editing
 workflows are not migrated yet. Explicit legacy account mappings can be
 provisioned by the isolated administrator tool; they do not infer permissions.
 
@@ -23,7 +23,8 @@ team/member directory with team creation/renaming. Apply `sql/001-projections.sq
 `sql/021-ladders-evaluation-history.sql`, `sql/022-ladders-comment-visibility.sql` and
 `sql/023-ladders-evaluation-editing.sql`,
 `sql/024-ladders-evaluation-deletion.sql` and
-`sql/025-ladders-smart-goals.sql` and `sql/026-legacy-account-mapping.sql` to the isolated
+`sql/025-ladders-smart-goals.sql`, `sql/026-legacy-account-mapping.sql` and
+`sql/027-ladders-employee-view.sql` to the isolated
 database using its local Compose `exec db psql` command; never apply it to the
 production database. Fresh imports apply these API SQL files automatically.
 The API's workspace directory only lists explicit app/workspace grants.
@@ -110,6 +111,19 @@ and vacations. The existing linked-account-per-team unique constraint yields
 409 without clearing either link or partially moving a member. Moving to the
 current team returns the roster without changing its timestamp. The frontend
 reuses UI's accessible team selector, saves explicitly and keeps its member URL.
+
+Verified Ladders employees use `GET /api/ladders/me/members` and
+`GET /api/ladders/me/members/:member/evaluations`. Access requires an explicit
+administrator-provisioned legacy mapping and the existing member account link;
+email or workspace owner/editor/viewer grants never infer personal ownership.
+The directory returns only linked member profiles and their workspace names.
+The history returns own self drafts/published self evaluations and published
+manager/peer versions, newest-first. Private reviewer drafts, legacy account IDs,
+tokens and visibility metadata never leave the server. Hidden comment text is
+removed in SQL: peer comments default hidden, others default visible, with explicit
+per-comment overrides. Unmapping revokes employee reads on the next request;
+missing/foreign members return 404. These reads do not create workspace grants
+or permit employee writes. The shared viewer/layout/languages/footer are reused.
 
 Internal Ladders owner/editor/viewer grants read
 `GET /api/ladders/workspaces/:workspace/members/:member/evaluations`.

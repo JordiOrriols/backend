@@ -65,6 +65,69 @@ const database = new PlatformDatabase(required("DATABASE_URL"));
 
 @Controller("api")
 class PlatformController {
+  @Get("ladders/workspaces/:workspace/members/:member/account-link")
+  async laddersMemberAccountLink(
+    @Headers("cf-access-jwt-assertion") token: string | undefined,
+    @Param("workspace", new ParseUUIDPipe()) workspace: string,
+    @Param("member", new ParseUUIDPipe()) member: string
+  ) {
+    return this.execute(token, (id) =>
+      database.laddersMemberInvitationManagement(id, workspace, member, "get")
+    );
+  }
+  @Post("ladders/workspaces/:workspace/members/:member/invitations/recipients/:recipient")
+  async laddersInviteMember(
+    @Headers("cf-access-jwt-assertion") token: string | undefined,
+    @Param("workspace", new ParseUUIDPipe()) workspace: string,
+    @Param("member", new ParseUUIDPipe()) member: string,
+    @Param("recipient", new ParseUUIDPipe()) recipient: string
+  ) {
+    return this.execute(token, (id) =>
+      database.laddersMemberInvitationManagement(id, workspace, member, "invite", recipient)
+    );
+  }
+  @Delete("ladders/workspaces/:workspace/members/:member/invitations")
+  async laddersRevokeMemberInvitation(
+    @Headers("cf-access-jwt-assertion") token: string | undefined,
+    @Param("workspace", new ParseUUIDPipe()) workspace: string,
+    @Param("member", new ParseUUIDPipe()) member: string
+  ) {
+    return this.execute(token, (id) =>
+      database.laddersMemberInvitationManagement(id, workspace, member, "revoke")
+    );
+  }
+  @Delete("ladders/workspaces/:workspace/members/:member/account-link")
+  async laddersUnlinkMember(
+    @Headers("cf-access-jwt-assertion") token: string | undefined,
+    @Param("workspace", new ParseUUIDPipe()) workspace: string,
+    @Param("member", new ParseUUIDPipe()) member: string
+  ) {
+    return this.execute(token, (id) =>
+      database.laddersMemberInvitationManagement(id, workspace, member, "unlink")
+    );
+  }
+  @Get("ladders/me/member-invitations")
+  async laddersMyMemberInvitations(@Headers("cf-access-jwt-assertion") token: string | undefined) {
+    return this.execute(token, (id) => database.laddersMyMemberInvitations(id));
+  }
+  @Post("ladders/me/member-invitations/:invitation/accept")
+  async laddersAcceptMemberInvitation(
+    @Headers("cf-access-jwt-assertion") token: string | undefined,
+    @Param("invitation", new ParseUUIDPipe()) invitation: string
+  ) {
+    return this.execute(token, (id) =>
+      database.laddersAnswerMemberInvitation(id, invitation, true)
+    );
+  }
+  @Post("ladders/me/member-invitations/:invitation/decline")
+  async laddersDeclineMemberInvitation(
+    @Headers("cf-access-jwt-assertion") token: string | undefined,
+    @Param("invitation", new ParseUUIDPipe()) invitation: string
+  ) {
+    return this.execute(token, (id) =>
+      database.laddersAnswerMemberInvitation(id, invitation, false)
+    );
+  }
   @Get("ladders/workspaces/:workspace/members/:member/peer-candidates")
   async laddersPeerCandidates(
     @Headers("cf-access-jwt-assertion") token: string | undefined,

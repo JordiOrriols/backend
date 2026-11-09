@@ -2,8 +2,8 @@
 
 This isolated branch adds a NestJS/TypeScript API and plain PostgreSQL 17.
 It does not modify production workflows or publish packages.
-The Pulse/Agents adapters, shared workspace lifecycle and member invitation
-workflows are not migrated yet. Explicit legacy account mappings can be
+The Pulse/Agents adapters and shared workspace lifecycle
+are not migrated yet. Explicit legacy account mappings can be
 provisioned by the isolated administrator tool; they do not infer permissions.
 
 The Shiplog and Planner isolated worktrees implement reduced views
@@ -25,9 +25,31 @@ team/member directory with team creation/renaming. Apply `sql/001-projections.sq
 `sql/024-ladders-evaluation-deletion.sql` and
 `sql/025-ladders-smart-goals.sql`, `sql/026-legacy-account-mapping.sql` and
 `sql/027-ladders-employee-view.sql`, `sql/028-ladders-self-evaluations.sql` and
-`sql/029-ladders-employee-goals.sql` and `sql/030-ladders-peer-assignments.sql` to the isolated
+`sql/029-ladders-employee-goals.sql`, `sql/030-ladders-peer-assignments.sql` and
+`sql/031-ladders-member-invitations.sql` to the isolated
 database using its local Compose `exec db psql` command; never apply it to the
 production database. Fresh imports apply these API SQL files automatically.
+Ladders owners/editors manage member account links with
+`GET/DELETE /api/ladders/workspaces/:workspace/members/:member/account-link`, invite an exact
+previously authenticated platform account with `POST .../invitations/recipients/:recipient`,
+and revoke with `DELETE .../invitations`. The manager sees linked/pending booleans,
+not account/legacy identifiers or bearer tokens. Recipients find invitations at
+`GET /api/ladders/me/member-invitations` and explicitly `POST .../:invitation/accept`
+or `.../decline`. Only the exact verified account can read/answer; same email is
+irrelevant. Invites expire after 30 days, rotation invalidates the old ID and
+acceptance/decline consumes the invite. Concurrent acceptance links once.
+
+Acceptance creates an explicit platform-member association, never a legacy
+account, legacy mapping, simulated login or workspace/app grant. Existing legacy
+member links continue through explicit administrator mappings. A shared account
+resolver covers personal history, self writes, goal progress/comments and peer
+candidates/submissions for both link types. One account cannot link twice in a
+team; account/workspace/member locks serialize acceptance, and integrity triggers
+also prevent duplicate-team moves and conflicting legacy mappings. Unlink removes
+personal access and revokes reviews assigned to that member, preserving independent
+workspace grants, evaluation history and goal records. New invitations and unlink
+also invalidate old legacy member invitations. New Access accounts need no legacy
+identity mapping. No automatic Planner/Pulse shares are created.
 The API's workspace directory only lists explicit app/workspace grants.
 Catalog responses reuse the existing reduced release projection, without
 private engineering notes, audit entries or token settings.
@@ -115,14 +137,15 @@ reuses UI's accessible team selector, saves explicitly and keeps its member URL.
 
 Verified Ladders employees use `GET /api/ladders/me/members` and
 `GET /api/ladders/me/members/:member/evaluations`. Access requires an explicit
-administrator-provisioned legacy mapping and the existing member account link;
+explicit direct member link, or an administrator-provisioned legacy mapping
+with the existing legacy member account link;
 email or workspace owner/editor/viewer grants never infer personal ownership.
 The directory returns only linked member profiles and their workspace names.
 The history returns own self drafts/published self evaluations and published
 manager/peer versions, newest-first. Private reviewer drafts, legacy account IDs,
 tokens and visibility metadata never leave the server. Hidden comment text is
 removed in SQL: peer comments default hidden, others default visible, with explicit
-per-comment overrides. Unmapping revokes employee reads on the next request;
+per-comment overrides. Unlinking (or unmapping a legacy-linked member) revokes employee reads on the next request;
 missing/foreign members return 404. These reads do not create workspace grants
 or permit employee writes. The shared viewer/layout/languages/footer are reused.
 
@@ -148,7 +171,7 @@ Employees read their own goals using `GET /api/ladders/me/members/:member/goals`
 and `authorKind: member`. Neither route changes title, description, due date,
 membership, previous comments or ownership. Existing legacy comments survive.
 The same mapping/member locks serialize updates and concurrent comment appends.
-Foreign goals/members and unmapped accounts are denied, independently of any
+Foreign goals/members and unlinked accounts are denied, independently of any
 workspace grant. Employees cannot create or delete goals. The existing member
 mode of `SmartGoalsPanel` is reused for progress and comments, with no new form.
 
@@ -156,7 +179,7 @@ Owners/editors manage authenticated peer reviews with
 `GET .../members/:member/peer-candidates`, `GET .../peer-assignments`,
 `POST .../peer-assignments/reviewers/:reviewer` (the reviewer's member UUID), and
 `DELETE .../peer-assignments/:assignment`. Candidates are already-linked,
-explicitly mapped colleagues in the same workspace, never email matches.
+verified colleagues in the same workspace, through direct or legacy-mapped links, never email matches.
 Self review and duplicate pending assignments are rejected. The manager projection
 contains assignment ID, reviewer display name and submitted/revoked flags only.
 Reviewers use `GET /api/ladders/me/peer-assignments` and

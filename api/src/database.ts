@@ -33,6 +33,37 @@ export interface PriorityProposal {
 }
 
 export class PlatformDatabase {
+  async laddersMemberInvitationManagement(
+    account: string,
+    workspace: string,
+    member: string,
+    action: "get" | "invite" | "revoke" | "unlink",
+    recipient: string | null = null
+  ): Promise<unknown> {
+    const result = await this.pool.query<{ data: unknown }>(
+      "SELECT platform.ladders_member_invitation_management($1,$2,$3,$4,$5) AS data",
+      [account, workspace, member, action, recipient]
+    );
+    return result.rows[0]!.data;
+  }
+  async laddersMyMemberInvitations(account: string): Promise<unknown> {
+    const result = await this.pool.query<{ data: unknown }>(
+      "SELECT platform.ladders_my_member_invitations($1) AS data",
+      [account]
+    );
+    return result.rows[0]!.data;
+  }
+  async laddersAnswerMemberInvitation(
+    account: string,
+    invitation: string,
+    accept: boolean
+  ): Promise<unknown> {
+    const result = await this.pool.query<{ data: unknown }>(
+      "SELECT platform.ladders_answer_member_invitation($1,$2,$3) AS data",
+      [account, invitation, accept]
+    );
+    return result.rows[0]!.data;
+  }
   async laddersPeerManagement(
     account: string,
     workspace: string,

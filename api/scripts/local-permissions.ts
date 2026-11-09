@@ -98,7 +98,8 @@ export async function runPermissionCommand(client: Client, args: string[]): Prom
   try {
     const account = await client.query(
       `SELECT id FROM platform.users WHERE id=$1
-       AND EXISTS (SELECT 1 FROM platform.identities WHERE user_id=$1) FOR KEY SHARE`,
+       AND EXISTS (SELECT 1 FROM platform.identities WHERE user_id=$1)
+       FOR ${command.action === "map-legacy" ? "UPDATE" : "KEY SHARE"}`,
       [command.userId]
     );
     if (!account.rowCount)

@@ -2,8 +2,9 @@
 
 This isolated branch adds a NestJS/TypeScript API and plain PostgreSQL 17.
 It does not modify production workflows or publish packages.
-The Pulse/Agents adapters, shared workspace lifecycle and explicit legacy
-account mapping are not migrated yet.
+The Pulse/Agents adapters, shared workspace lifecycle and employee-scoped
+workflows are not migrated yet. Explicit legacy account mappings can be
+provisioned by the isolated administrator tool; they do not infer permissions.
 
 The Shiplog and Planner isolated worktrees implement reduced views
 at `/shiplog/workspaces/:workspace/releases` and
@@ -22,7 +23,7 @@ team/member directory with team creation/renaming. Apply `sql/001-projections.sq
 `sql/021-ladders-evaluation-history.sql`, `sql/022-ladders-comment-visibility.sql` and
 `sql/023-ladders-evaluation-editing.sql`,
 `sql/024-ladders-evaluation-deletion.sql` and
-`sql/025-ladders-smart-goals.sql` to the isolated
+`sql/025-ladders-smart-goals.sql` and `sql/026-legacy-account-mapping.sql` to the isolated
 database using its local Compose `exec db psql` command; never apply it to the
 production database. Fresh imports apply these API SQL files automatically.
 The API's workspace directory only lists explicit app/workspace grants.
@@ -417,8 +418,8 @@ The production Docker image runs as a nonroot user and contains no dev tooling.
 
 The user must first authenticate with Access (`GET /api/me`). Review the user's
 platform UUID **and verified issuer/subject**, not just their email: identical
-emails never imply identical accounts. This tool does not create identities,
-link legacy accounts, or change application records.
+emails never imply identical accounts. This tool does not create identities
+or change imported application records.
 
 Run the separate tools-profile container against the isolated database:
 
@@ -427,12 +428,29 @@ docker compose --env-file .env -f compose.local.yml build permissions
 docker compose --env-file .env -f compose.local.yml run --rm permissions users
 docker compose --env-file .env -f compose.local.yml run --rm permissions workspaces
 docker compose --env-file .env -f compose.local.yml run --rm permissions grants
+docker compose --env-file .env -f compose.local.yml run --rm permissions legacy-users
+docker compose --env-file .env -f compose.local.yml run --rm permissions mappings
+docker compose --env-file .env -f compose.local.yml run --rm permissions map-legacy <platform-user-uuid> <legacy-user-uuid>
+docker compose --env-file .env -f compose.local.yml run --rm permissions unmap-legacy <platform-user-uuid> <legacy-user-uuid>
 docker compose --env-file .env -f compose.local.yml run --rm permissions grant <platform-user-uuid> planner <workspace-uuid> external
 docker compose --env-file .env -f compose.local.yml run --rm permissions revoke <platform-user-uuid> planner <workspace-uuid>
 ```
 
 Export `GITHUB_TOKEN` for the build, as for the other images. Output from `users`
 contains identity metadata and must remain private.
+The `legacy-users` output is also private. Review exact IDs and the verified
+issuer/subject out of band before mapping; an email address is not proof of
+ownership. No command searches or matches identities by email.
+
+Legacy mappings are one-to-one and administrator-only. Repeating the same pair
+is idempotent and preserves its creation date; conflicting pairs fail instead
+of being reassigned. Unmapping requires both exact IDs. Mapping never creates
+grants, changes legacy owner/member FKs, or merges verified subjects; unmapping
+never revokes independently provisioned workspace grants. The runtime role and
+legacy browser roles cannot read or modify the mapping table, and `/api/me`
+does not expose it. This is the identity foundation, not yet employee access,
+member invitation acceptance or a production mapping procedure.
+
 Apps: `planner`, `shiplog`, `ladders`, `pulse`, `agents`.
 Roles: `owner`, `editor`, `viewer`, `external` (last only for Planner/Shiplog).
 Granting an existing app/workspace replaces its role; revocation affects only

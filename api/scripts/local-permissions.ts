@@ -4,9 +4,12 @@ import { APPLICATIONS, type Application } from "../src/database.js";
 const ROLES = ["owner", "editor", "viewer", "external"] as const;
 type Role = (typeof ROLES)[number];
 type PermissionCommand =
-  | { action: "users" | "workspaces" | "grants" }
+  | { action: "users" | "workspaces" | "grants" | "legacy-users" | "mappings" }
   | { action: "grant"; userId: string; app: Application; workspaceId: string; role: Role }
-  | { action: "revoke"; userId: string; app: Application; workspaceId: string };
+  | { action: "revoke"; userId: string; app: Application; workspaceId: string }
+  | { action: "map-legacy" | "unmap-legacy"; userId: string; legacyUserId: string };
+
+const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export function localPermissionConnection(env: NodeJS.ProcessEnv): string {
   const connection = env.DATABASE_URL;
@@ -27,13 +30,24 @@ export function localPermissionConnection(env: NodeJS.ProcessEnv): string {
 
 export function parsePermissionCommand(args: string[]): PermissionCommand {
   const [action, userId, app, workspaceId, role] = args;
-  if ((action === "users" || action === "workspaces" || action === "grants") && args.length === 1)
+  if (
+    (action === "users" ||
+      action === "workspaces" ||
+      action === "grants" ||
+      action === "legacy-users" ||
+      action === "mappings") &&
+    args.length === 1
+  )
     return { action };
+  if (action === "map-legacy" || action === "unmap-legacy") {
+    if (args.length !== 3 || !userId || !app || !uuid.test(userId) || !uuid.test(app))
+      throw new Error(`Usage: ${action} <verified-platform-user-id> <legacy-user-id>`);
+    return { action, userId, legacyUserId: app };
+  }
   if ((action !== "grant" && action !== "revoke") || args.length !== (action === "grant" ? 5 : 4))
     throw new Error(
-      "Usage: users | workspaces | grants | grant <user-id> <app> <workspace-id> <role> | revoke <user-id> <app> <workspace-id>"
+      "Usage: users | workspaces | grants | legacy-users | mappings | map-legacy <user-id> <legacy-user-id> | unmap-legacy <user-id> <legacy-user-id> | grant <user-id> <app> <workspace-id> <role> | revoke <user-id> <app> <workspace-id>"
     );
-  const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
   if (!userId || !workspaceId || !uuid.test(userId) || !uuid.test(workspaceId))
     throw new Error("User and workspace must be UUIDs");
   const application = APPLICATIONS.find((candidate) => candidate === app);
@@ -64,7 +78,20 @@ export async function runPermissionCommand(client: Client, args: string[]): Prom
          ORDER BY user_id,app,workspace_id`
       )
     ).rows;
-  if (command.action !== "grant" && command.action !== "revoke")
+  if (command.action === "legacy-users")
+    return (await client.query("SELECT id,email FROM auth.users ORDER BY id")).rows;
+  if (command.action === "mappings")
+    return (
+      await client.query(
+        "SELECT user_id,legacy_user_id,created_at FROM platform.legacy_account_mappings ORDER BY user_id"
+      )
+    ).rows;
+  if (
+    command.action !== "grant" &&
+    command.action !== "revoke" &&
+    command.action !== "map-legacy" &&
+    command.action !== "unmap-legacy"
+  )
     throw new Error("Unsupported permission command");
 
   await client.query("BEGIN");
@@ -76,6 +103,37 @@ export async function runPermissionCommand(client: Client, args: string[]): Prom
     );
     if (!account.rowCount)
       throw new Error("Unknown platform user: the user must first authenticate through Access");
+    if (command.action === "map-legacy" || command.action === "unmap-legacy") {
+      const legacy = await client.query("SELECT id FROM auth.users WHERE id=$1 FOR KEY SHARE", [
+        command.legacyUserId,
+      ]);
+      if (!legacy.rowCount) throw new Error("Unknown legacy user");
+      const values = [command.userId, command.legacyUserId];
+      let result =
+        command.action === "map-legacy"
+          ? await client.query(
+              `INSERT INTO platform.legacy_account_mappings(user_id,legacy_user_id) VALUES($1,$2)
+               ON CONFLICT DO NOTHING RETURNING user_id,legacy_user_id,created_at`,
+              values
+            )
+          : await client.query(
+              `DELETE FROM platform.legacy_account_mappings WHERE user_id=$1 AND legacy_user_id=$2
+               RETURNING user_id,legacy_user_id,created_at`,
+              values
+            );
+      if (!result.rowCount && command.action === "map-legacy") {
+        result = await client.query(
+          `SELECT user_id,legacy_user_id,created_at FROM platform.legacy_account_mappings
+           WHERE user_id=$1 AND legacy_user_id=$2 FOR SHARE`,
+          values
+        );
+        if (!result.rowCount)
+          throw new Error("Account already mapped: explicitly unmap the existing pair first");
+      }
+      if (!result.rowCount) throw new Error("No matching legacy mapping to remove");
+      await client.query("COMMIT");
+      return { action: command.action, mapping: result.rows[0] };
+    }
     const workspace = await client.query(
       "SELECT id FROM public.workspaces WHERE id=$1 FOR KEY SHARE",
       [command.workspaceId]

@@ -6,7 +6,7 @@ const user = "11111111-1111-4111-8111-111111111111";
 const workspace = "22222222-2222-4222-8222-222222222222";
 
 test("local permission commands validate exact IDs, apps, roles and argument counts", () => {
-  for (const action of ["users", "workspaces", "grants"])
+  for (const action of ["users", "workspaces", "grants", "legacy-users", "mappings"])
     assert.deepEqual(parsePermissionCommand([action]), { action });
   assert.deepEqual(parsePermissionCommand(["grant", user, "planner", workspace, "external"]), {
     action: "grant",
@@ -43,6 +43,28 @@ test("local permission commands validate exact IDs, apps, roles and argument cou
     ...["ladders", "pulse", "agents"].map((app) => ["grant", user, app, workspace, "external"]),
   ])
     assert.throws(() => parsePermissionCommand(args));
+});
+
+test("legacy mapping commands require two exact IDs and never accept email matching", () => {
+  for (const action of ["map-legacy", "unmap-legacy"]) {
+    assert.deepEqual(parsePermissionCommand([action, user, workspace]), {
+      action,
+      userId: user,
+      legacyUserId: workspace,
+    });
+    for (const args of [
+      [action],
+      [action, user],
+      [action, user, workspace, "extra"],
+      [action, "person@example.com", workspace],
+      [action, user, "person@example.com"],
+      [action, "", workspace],
+      [action, user, ""],
+    ])
+      assert.throws(() => parsePermissionCommand(args));
+  }
+  for (const action of ["legacy-users", "mappings"])
+    assert.throws(() => parsePermissionCommand([action, user]));
 });
 
 test("permission administration refuses remote, ambiguous or unconfirmed database targets", () => {

@@ -2,7 +2,8 @@
 
 This isolated branch adds a NestJS/TypeScript API and plain PostgreSQL 17.
 It does not modify production workflows or publish packages.
-The Pulse/Agents adapters are not migrated yet. The shared workspace lifecycle
+Pulse surveys are migrated; its retrospectives/actions/overview and the Agents adapter
+remain pending. The shared workspace lifecycle
 API and its central management screen are implemented. Explicit legacy account mappings can be
 provisioned by the isolated administrator tool; they do not infer permissions.
 
@@ -26,9 +27,39 @@ team/member directory with team creation/renaming. Apply `sql/001-projections.sq
 `sql/025-ladders-smart-goals.sql`, `sql/026-legacy-account-mapping.sql` and
 `sql/027-ladders-employee-view.sql`, `sql/028-ladders-self-evaluations.sql` and
 `sql/029-ladders-employee-goals.sql`, `sql/030-ladders-peer-assignments.sql` and
-`sql/031-ladders-member-invitations.sql` and `sql/032-workspace-lifecycle.sql` to the isolated
+`sql/031-ladders-member-invitations.sql`, `sql/032-workspace-lifecycle.sql` and
+`sql/033-pulse-surveys.sql` to the isolated
 database using its local Compose `exec db psql` command; never apply it to the
 production database. Fresh imports apply these API SQL files automatically.
+
+## Pulse anonymous surveys
+
+The `/pulse/` Access frontend reuses its existing survey view, dialogs, hook and
+report calculations. It links the shared workspace lifecycle screen rather than
+duplicating it. Local app/gateway ports are 5316/5320. The runtime has no legacy
+authentication initialization. Retrospectives, actions and overview remain pending.
+
+- `GET /api/pulse/workspaces/:workspace/surveys` returns questions and only the
+  caller's answered marker, never participant lists or response identities.
+- `GET .../survey-results` returns counts. Rating distributions and separate,
+  alphabetically ordered comments require closed status and the minimum responses.
+- `POST .../surveys` requires owner/editor and bounded title/questions/options.
+- `POST .../surveys/:survey/responses` requires Pulse owner/editor/viewer access,
+  open status and an exact complete map of 1–5 ratings. Concurrent submissions
+  consume one separate participation marker, with no account/time on responses
+  and no response linkage on comments.
+- `PATCH .../surveys/:survey` with `{status}` closes/reopens; `DELETE` removes the
+  survey, answers, comments and participation markers. Both require owner/editor.
+
+All operations check explicit app/workspace grants and reject foreign survey IDs.
+Existing explicitly mapped legacy participation prevents answering twice. New
+answers by mapped identities also mark the real legacy account's participation
+without manufacturing accounts or attaching that identity to anonymous answers.
+Runtime SQL cannot read response/comment/participation tables or call the internal
+authorization helper directly. Survey mutations serialize against workspace and
+survey deletion; API roles are rechecked on every request.
+The schema is local-only; normal clean image builds need registry credentials
+provided as a BuildKit secret, not source links or committed tokens.
 
 ## Verified workspace lifecycle
 
@@ -628,7 +659,7 @@ shell and run:
 
 ```sh
 docker compose --env-file .env -f compose.local.yml build permissions
-docker compose --env-file .env -f compose.local.yml -f compose.test.yml --profile web up -d --build api planner shiplog gateway access-fixture
+docker compose --env-file .env -f compose.local.yml -f compose.test.yml --profile web up -d --build api planner shiplog ladders pulse gateway access-fixture
 ```
 
 Run `PLATFORM_DOCKER_WEB=1 npx playwright test --config=platform-local.config.ts`
@@ -638,12 +669,12 @@ deep-route reloads, missing authentication and permission revocation.
 Stop the `access-fixture` service after the checks and recreate `api` with only
 `compose.local.yml` to restore real Access issuer/audience verification.
 
-The gateway provides the single-origin layout for both apps. To start the
+The gateway provides the single-origin layout for migrated apps. To start the
 complete local test stack, explicitly include the test override in every
 Compose command (omitting it resets the API to normal Access configuration):
 
 ```sh
-docker compose --env-file .env -f compose.local.yml -f compose.test.yml --profile web up -d --build api planner shiplog gateway access-fixture
+docker compose --env-file .env -f compose.local.yml -f compose.test.yml --profile web up -d --build api planner shiplog ladders pulse gateway access-fixture
 ```
 
 After recreating the API container, restart the local Nginx web/gateway services

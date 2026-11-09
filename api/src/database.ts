@@ -2,6 +2,7 @@ import { Pool } from "pg";
 import type { AccessIdentity } from "./access.js";
 import type { MemberProfileInput, EvaluationContent, SmartGoalInput } from "./ladders-input.js";
 import type { ApplicationInput, ReleaseInput, ChecklistInput } from "./shiplog-input.js";
+import type { SurveyInput } from "./pulse-input.js";
 import type {
   PriorityInput,
   ProposalInput,
@@ -33,6 +34,56 @@ export interface PriorityProposal {
 }
 
 export class PlatformDatabase {
+  async pulseSurveys(account: string, workspace: string): Promise<unknown> {
+    const result = await this.pool.query<{ data: unknown }>(
+      "SELECT platform.pulse_surveys($1,$2) AS data",
+      [account, workspace]
+    );
+    return result.rows[0]!.data;
+  }
+  async pulseSurveyResults(account: string, workspace: string): Promise<unknown> {
+    const result = await this.pool.query<{ data: unknown }>(
+      "SELECT platform.pulse_survey_results($1,$2) AS data",
+      [account, workspace]
+    );
+    return result.rows[0]!.data;
+  }
+  async pulseCreateSurvey(
+    account: string,
+    workspace: string,
+    content: SurveyInput
+  ): Promise<unknown> {
+    const result = await this.pool.query<{ data: unknown }>(
+      "SELECT platform.pulse_create_survey($1,$2,$3) AS data",
+      [account, workspace, content]
+    );
+    return result.rows[0]!.data;
+  }
+  async pulseSubmitResponse(
+    account: string,
+    workspace: string,
+    survey: string,
+    ratings: Record<string, unknown>,
+    comment: string
+  ): Promise<unknown> {
+    const result = await this.pool.query<{ data: unknown }>(
+      "SELECT platform.pulse_submit_response($1,$2,$3,$4,$5) AS data",
+      [account, workspace, survey, ratings, comment]
+    );
+    return result.rows[0]!.data;
+  }
+  async pulseManageSurvey(
+    account: string,
+    workspace: string,
+    survey: string,
+    action: "open" | "closed" | "delete"
+  ): Promise<unknown> {
+    const result = await this.pool.query<{ data: unknown }>(
+      "SELECT platform.pulse_manage_survey($1,$2,$3,$4) AS data",
+      [account, workspace, survey, action]
+    );
+    return result.rows[0]!.data;
+  }
   async createWorkspace(account: string, name: string): Promise<unknown> {
     const result = await this.pool.query<{ data: unknown }>(
       "SELECT platform.create_workspace($1,$2) AS data",

@@ -108,13 +108,21 @@ services:
     ports: ["127.0.0.1:5314:80"]
     depends_on: [api]
     networks: [edge]
+  pulse:
+    profiles: [web]
+    build:
+      context: ../../pulse-access-local
+      secrets: [github_token]
+    ports: ["127.0.0.1:5316:80"]
+    depends_on: [api]
+    networks: [edge]
   gateway:
     profiles: [web]
     image: nginx:1.28-alpine
     ports: ["127.0.0.1:5320:80"]
     volumes:
       - ./docker/gateway.conf:/etc/nginx/conf.d/default.conf:ro
-    depends_on: [api, planner, shiplog, ladders]
+    depends_on: [api, planner, shiplog, ladders, pulse]
     networks: [edge]
 secrets:
   github_token:

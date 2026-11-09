@@ -21,6 +21,7 @@ import {
 import { NestFactory } from "@nestjs/core";
 import { AccessVerifier } from "./access.js";
 import { APPLICATIONS, PlatformDatabase } from "./database.js";
+import { surveyInput, surveyResponseInput, surveyStatusInput } from "./pulse-input.js";
 import {
   memberProfileInput,
   commentVisibilityInput,
@@ -81,6 +82,67 @@ function workspaceRole(body: unknown): "editor" | "viewer" | "external" {
 
 @Controller("api")
 class PlatformController {
+  @Get("pulse/workspaces/:workspace/surveys")
+  async pulseSurveys(
+    @Headers("cf-access-jwt-assertion") token: string | undefined,
+    @Param("workspace", new ParseUUIDPipe()) workspace: string
+  ) {
+    return this.execute(token, (id) => database.pulseSurveys(id, workspace));
+  }
+  @Get("pulse/workspaces/:workspace/survey-results")
+  async pulseSurveyResults(
+    @Headers("cf-access-jwt-assertion") token: string | undefined,
+    @Param("workspace", new ParseUUIDPipe()) workspace: string
+  ) {
+    return this.execute(token, (id) => database.pulseSurveyResults(id, workspace));
+  }
+  @Post("pulse/workspaces/:workspace/surveys")
+  async pulseCreateSurvey(
+    @Headers("cf-access-jwt-assertion") token: string | undefined,
+    @Param("workspace", new ParseUUIDPipe()) workspace: string,
+    @Body() body: unknown
+  ) {
+    return this.execute(token, (id) =>
+      database.pulseCreateSurvey(id, workspace, surveyInput(body))
+    );
+  }
+  @Post("pulse/workspaces/:workspace/surveys/:survey/responses")
+  async pulseSubmitResponse(
+    @Headers("cf-access-jwt-assertion") token: string | undefined,
+    @Param("workspace", new ParseUUIDPipe()) workspace: string,
+    @Param("survey", new ParseUUIDPipe()) survey: string,
+    @Body() body: unknown
+  ) {
+    return this.execute(token, (id) => {
+      const response = surveyResponseInput(body);
+      return database.pulseSubmitResponse(
+        id,
+        workspace,
+        survey,
+        response.ratings,
+        response.comment
+      );
+    });
+  }
+  @Patch("pulse/workspaces/:workspace/surveys/:survey")
+  async pulseManageSurvey(
+    @Headers("cf-access-jwt-assertion") token: string | undefined,
+    @Param("workspace", new ParseUUIDPipe()) workspace: string,
+    @Param("survey", new ParseUUIDPipe()) survey: string,
+    @Body() body: unknown
+  ) {
+    return this.execute(token, (id) =>
+      database.pulseManageSurvey(id, workspace, survey, surveyStatusInput(body))
+    );
+  }
+  @Delete("pulse/workspaces/:workspace/surveys/:survey")
+  async pulseDeleteSurvey(
+    @Headers("cf-access-jwt-assertion") token: string | undefined,
+    @Param("workspace", new ParseUUIDPipe()) workspace: string,
+    @Param("survey", new ParseUUIDPipe()) survey: string
+  ) {
+    return this.execute(token, (id) => database.pulseManageSurvey(id, workspace, survey, "delete"));
+  }
   @Post("workspaces")
   async createWorkspace(
     @Headers("cf-access-jwt-assertion") token: string | undefined,

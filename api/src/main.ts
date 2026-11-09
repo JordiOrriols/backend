@@ -65,6 +65,62 @@ const database = new PlatformDatabase(required("DATABASE_URL"));
 
 @Controller("api")
 class PlatformController {
+  @Get("ladders/workspaces/:workspace/members/:member/peer-candidates")
+  async laddersPeerCandidates(
+    @Headers("cf-access-jwt-assertion") token: string | undefined,
+    @Param("workspace", new ParseUUIDPipe()) workspace: string,
+    @Param("member", new ParseUUIDPipe()) member: string
+  ) {
+    return this.execute(token, (id) =>
+      database.laddersPeerManagement(id, workspace, member, "candidates")
+    );
+  }
+  @Get("ladders/workspaces/:workspace/members/:member/peer-assignments")
+  async laddersPeerAssignments(
+    @Headers("cf-access-jwt-assertion") token: string | undefined,
+    @Param("workspace", new ParseUUIDPipe()) workspace: string,
+    @Param("member", new ParseUUIDPipe()) member: string
+  ) {
+    return this.execute(token, (id) =>
+      database.laddersPeerManagement(id, workspace, member, "list")
+    );
+  }
+  @Post("ladders/workspaces/:workspace/members/:member/peer-assignments/reviewers/:reviewer")
+  async laddersAssignPeer(
+    @Headers("cf-access-jwt-assertion") token: string | undefined,
+    @Param("workspace", new ParseUUIDPipe()) workspace: string,
+    @Param("member", new ParseUUIDPipe()) member: string,
+    @Param("reviewer", new ParseUUIDPipe()) reviewer: string
+  ) {
+    return this.execute(token, (id) =>
+      database.laddersPeerManagement(id, workspace, member, "assign", reviewer)
+    );
+  }
+  @Delete("ladders/workspaces/:workspace/members/:member/peer-assignments/:assignment")
+  async laddersRevokePeer(
+    @Headers("cf-access-jwt-assertion") token: string | undefined,
+    @Param("workspace", new ParseUUIDPipe()) workspace: string,
+    @Param("member", new ParseUUIDPipe()) member: string,
+    @Param("assignment", new ParseUUIDPipe()) assignment: string
+  ) {
+    return this.execute(token, (id) =>
+      database.laddersPeerManagement(id, workspace, member, "revoke", assignment)
+    );
+  }
+  @Get("ladders/me/peer-assignments")
+  async laddersMyPeerAssignments(@Headers("cf-access-jwt-assertion") token: string | undefined) {
+    return this.execute(token, (id) => database.laddersMyPeerAssignments(id));
+  }
+  @Post("ladders/me/peer-assignments/:assignment/submit")
+  async laddersSubmitPeer(
+    @Headers("cf-access-jwt-assertion") token: string | undefined,
+    @Param("assignment", new ParseUUIDPipe()) assignment: string,
+    @Body() body: unknown
+  ) {
+    return this.execute(token, (id) =>
+      database.laddersSubmitPeer(id, assignment, evaluationContentInput(body))
+    );
+  }
   @Get("ladders/me/members/:member/goals")
   async laddersMyGoals(
     @Headers("cf-access-jwt-assertion") token: string | undefined,

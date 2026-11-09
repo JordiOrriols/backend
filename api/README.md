@@ -2,7 +2,7 @@
 
 This isolated branch adds a NestJS/TypeScript API and plain PostgreSQL 17.
 It does not modify production workflows or publish packages.
-The Pulse/Agents adapters, shared workspace lifecycle and authenticated peer
+The Pulse/Agents adapters, shared workspace lifecycle and member invitation
 workflows are not migrated yet. Explicit legacy account mappings can be
 provisioned by the isolated administrator tool; they do not infer permissions.
 
@@ -25,7 +25,7 @@ team/member directory with team creation/renaming. Apply `sql/001-projections.sq
 `sql/024-ladders-evaluation-deletion.sql` and
 `sql/025-ladders-smart-goals.sql`, `sql/026-legacy-account-mapping.sql` and
 `sql/027-ladders-employee-view.sql`, `sql/028-ladders-self-evaluations.sql` and
-`sql/029-ladders-employee-goals.sql` to the isolated
+`sql/029-ladders-employee-goals.sql` and `sql/030-ladders-peer-assignments.sql` to the isolated
 database using its local Compose `exec db psql` command; never apply it to the
 production database. Fresh imports apply these API SQL files automatically.
 The API's workspace directory only lists explicit app/workspace grants.
@@ -152,6 +152,25 @@ Foreign goals/members and unmapped accounts are denied, independently of any
 workspace grant. Employees cannot create or delete goals. The existing member
 mode of `SmartGoalsPanel` is reused for progress and comments, with no new form.
 
+Owners/editors manage authenticated peer reviews with
+`GET .../members/:member/peer-candidates`, `GET .../peer-assignments`,
+`POST .../peer-assignments/reviewers/:reviewer` (the reviewer's member UUID), and
+`DELETE .../peer-assignments/:assignment`. Candidates are already-linked,
+explicitly mapped colleagues in the same workspace, never email matches.
+Self review and duplicate pending assignments are rejected. The manager projection
+contains assignment ID, reviewer display name and submitted/revoked flags only.
+Reviewers use `GET /api/ladders/me/peer-assignments` and
+`POST .../:assignment/submit`. They receive the target profile but no evaluation
+history, workspace directory access, account IDs or tokens. Mapping/link/workspace
+scope is rechecked on reads and writes. Unmapping, moving out of the workspace
+or revocation denies submission. Each assignment permits one submission, including
+under concurrent requests; it remains completed if the evaluation is later deleted.
+The server derives authorship from the reviewer's linked member, forces peer/draft,
+empty goal levels and default-hidden comment visibility, ignoring caller identities.
+Existing manager moderation and per-comment visibility publish/share the result.
+Revoking an assignment never deletes submitted feedback. The shared assessment
+editor is reused without history or name input; anonymous peer routes stay disabled.
+
 Internal Ladders owner/editor/viewer grants read
 `GET /api/ladders/workspaces/:workspace/members/:member/evaluations`.
 The explicit projection returns evaluation ID/member ID/kind/status/author name,
@@ -204,7 +223,7 @@ stay enabled; runtime direct INSERT/UPDATE is denied. Responses use the explicit
 history projection. The frontend reuses the existing queued 500ms autosave hook,
 assessment form and version panel through a typed store; no legacy auth/database
 adapter is initialized. Authenticated self evaluation editing uses the separate
-member-scoped routes described above; peer assignments remain pending.
+member-scoped routes described above; peer submissions use explicit assignments.
 
 Only owners delete evaluations with
 `DELETE .../members/:member/evaluations/:evaluation`. The function locks the

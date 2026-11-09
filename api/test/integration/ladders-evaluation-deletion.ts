@@ -127,10 +127,9 @@ test("Ladders evaluation deletion is owner-only and never exposes private self d
     await api.laddersDeleteEvaluation(account.id, workspace, member, selfPublished);
     assert.deepEqual(
       (
-        await admin.query(
-          "SELECT id FROM public.evaluations WHERE member_id=$1 ORDER BY id",
-          [member]
-        )
+        await admin.query("SELECT id FROM public.evaluations WHERE member_id=$1 ORDER BY id", [
+          member,
+        ])
       ).rows.map((row: { id: string }) => row.id),
       [privateSelfDraft].sort()
     );

@@ -64,6 +64,42 @@ const database = new PlatformDatabase(required("DATABASE_URL"));
 
 @Controller("api")
 class PlatformController {
+  @Get("ladders/me/members/:member/self-evaluations")
+  async laddersMySelfEvaluations(
+    @Headers("cf-access-jwt-assertion") token: string | undefined,
+    @Param("member", new ParseUUIDPipe()) member: string
+  ) {
+    return this.execute(token, (id) => database.laddersMySelfEvaluations(id, member));
+  }
+  @Post("ladders/me/members/:member/self-evaluations")
+  async laddersCreateMyEvaluation(
+    @Headers("cf-access-jwt-assertion") token: string | undefined,
+    @Param("member", new ParseUUIDPipe()) member: string,
+    @Body() body: unknown
+  ) {
+    return this.execute(token, (id) =>
+      database.laddersSaveMyEvaluation(id, member, null, evaluationContentInput(body))
+    );
+  }
+  @Patch("ladders/me/members/:member/self-evaluations/:evaluation")
+  async laddersUpdateMyEvaluation(
+    @Headers("cf-access-jwt-assertion") token: string | undefined,
+    @Param("member", new ParseUUIDPipe()) member: string,
+    @Param("evaluation", new ParseUUIDPipe()) evaluation: string,
+    @Body() body: unknown
+  ) {
+    return this.execute(token, (id) =>
+      database.laddersSaveMyEvaluation(id, member, evaluation, evaluationContentInput(body))
+    );
+  }
+  @Post("ladders/me/members/:member/self-evaluations/:evaluation/publish")
+  async laddersPublishMyEvaluation(
+    @Headers("cf-access-jwt-assertion") token: string | undefined,
+    @Param("member", new ParseUUIDPipe()) member: string,
+    @Param("evaluation", new ParseUUIDPipe()) evaluation: string
+  ) {
+    return this.execute(token, (id) => database.laddersPublishMyEvaluation(id, member, evaluation));
+  }
   @Get("ladders/me/members")
   async laddersMyMembers(@Headers("cf-access-jwt-assertion") token: string | undefined) {
     return this.execute(token, (id) => database.laddersMyMembers(id));

@@ -24,7 +24,7 @@ team/member directory with team creation/renaming. Apply `sql/001-projections.sq
 `sql/023-ladders-evaluation-editing.sql`,
 `sql/024-ladders-evaluation-deletion.sql` and
 `sql/025-ladders-smart-goals.sql`, `sql/026-legacy-account-mapping.sql` and
-`sql/027-ladders-employee-view.sql` to the isolated
+`sql/027-ladders-employee-view.sql` and `sql/028-ladders-self-evaluations.sql` to the isolated
 database using its local Compose `exec db psql` command; never apply it to the
 production database. Fresh imports apply these API SQL files automatically.
 The API's workspace directory only lists explicit app/workspace grants.
@@ -124,6 +124,22 @@ removed in SQL: peer comments default hidden, others default visible, with expli
 per-comment overrides. Unmapping revokes employee reads on the next request;
 missing/foreign members return 404. These reads do not create workspace grants
 or permit employee writes. The shared viewer/layout/languages/footer are reused.
+
+Linked employees edit their own self evaluations using
+`GET/POST /api/ladders/me/members/:member/self-evaluations`,
+`PATCH .../self-evaluations/:evaluation` and `POST .../:evaluation/publish`.
+The separate self-only projection returns the employee's own answers, including
+comments hidden in the mixed history projection, without reviewer versions or
+visibility metadata. Content writes whitelist levels/comments through the existing
+validator; identity, author, kind, status and visibility cannot be supplied.
+The server derives author name from the linked profile and creates drafts only.
+Only own self drafts update; published content stays immutable, and new answers
+create a new draft rather than replacing published history. Member-row locking
+serializes draft creation; mapping locks serialize writes with unmapping.
+Workspace manager/owner grants confer no personal write access.
+The frontend reuses the existing manager editor's extracted rendering and shared
+autosave hook, hides manager-only goal/visibility controls and never enables
+profile changes, deletion or unpublishing. Failed autosaves remain visible.
 
 Internal Ladders owner/editor/viewer grants read
 `GET /api/ladders/workspaces/:workspace/members/:member/evaluations`.

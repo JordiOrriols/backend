@@ -150,10 +150,127 @@ test("employee evaluations require explicit mapping and member ownership, redact
        FROM unnest(ARRAY['anon','authenticated','service_role']) r`
     );
     assert.ok(roles.rows.every((row) => row.denied));
+    const selfSnapshot = await api.laddersMySelfEvaluations(employee.id, member);
+    const selfVersions = snapshot.evaluations.filter((row) => row.kind === "self");
+    assert.deepEqual(selfSnapshot, { member: profile, evaluations: selfVersions });
+    const draft = selfVersions.find((row) => row.status === "draft")!;
+    const reviewer = snapshot.evaluations.find((row) => row.kind === "manager")!;
+    assert.equal(typeof draft.id, "string");
+    const draftId = String(draft.id);
+    const content = {
+      current_levels: { Technology: 3.5 },
+      goal_levels: {},
+      comments: { Technology: "Updated own draft" },
+    };
+    const reviewerBefore = await admin.query(
+      "SELECT to_jsonb(e) AS data FROM public.evaluations e WHERE id=$1",
+      [reviewer.id]
+    );
+    await assert.rejects(api.laddersMySelfEvaluations(sameEmail.id, member), /unavailable/);
+    await assert.rejects(
+      api.laddersSaveMyEvaluation(sameEmail.id, member, draftId, content),
+      /unavailable/
+    );
+    await assert.rejects(
+      api.laddersSaveMyEvaluation(employee.id, foreignMember, draftId, content),
+      /unavailable/
+    );
+    await assert.rejects(
+      api.laddersSaveMyEvaluation(employee.id, member, String(reviewer.id), content),
+      /unavailable/
+    );
+    await assert.rejects(
+      api.laddersPublishMyEvaluation(employee.id, member, String(reviewer.id)),
+      /unavailable/
+    );
+    await assert.rejects(
+      api.laddersSaveMyEvaluation(employee.id, member, null, content),
+      /already exists/
+    );
+    await assert.rejects(
+      api.laddersSaveMyEvaluation(employee.id, member, draftId, {
+        ...content,
+        current_levels: { Technology: 6 },
+      }),
+      /Invalid evaluation content/
+    );
+    assert.deepEqual(await api.laddersSaveMyEvaluation(employee.id, member, draftId, content), {
+      ...draft,
+      ...content,
+    });
+    assert.deepEqual(await api.laddersPublishMyEvaluation(employee.id, member, draftId), {
+      ...draft,
+      ...content,
+      status: "published",
+    });
+    await assert.rejects(
+      api.laddersSaveMyEvaluation(employee.id, member, draftId, content),
+      /immutable/
+    );
+    const attempts = await Promise.allSettled([
+      api.laddersSaveMyEvaluation(employee.id, member, null, content),
+      api.laddersSaveMyEvaluation(employee.id, member, null, content),
+    ]);
+    assert.equal(attempts.filter((attempt) => attempt.status === "fulfilled").length, 1);
+    assert.equal(attempts.filter((attempt) => attempt.status === "rejected").length, 1);
+    const newDraft = await admin.query<{
+      id: string;
+      author_name: string;
+      comment_visibility: unknown;
+    }>(
+      "SELECT id,author_name,comment_visibility FROM public.evaluations WHERE member_id=$1 AND kind='self' AND status='draft'",
+      [member]
+    );
+    assert.equal(newDraft.rows.length, 1);
+    assert.equal(newDraft.rows[0]!.author_name, profile.name);
+    assert.deepEqual(newDraft.rows[0]!.comment_visibility, {});
+    await admin.query(
+      "UPDATE public.evaluations SET comment_visibility='{\"Technology\":false}' WHERE id=$1",
+      [draftId]
+    );
+    assert.ok(
+      JSON.stringify(await api.laddersMySelfEvaluations(employee.id, member)).includes(
+        "Updated own draft"
+      )
+    );
+    const redacted = await restricted.query<{ data: { evaluations: Record<string, unknown>[] } }>(
+      "SELECT platform.ladders_my_evaluations($1,$2) AS data",
+      [employee.id, member]
+    );
+    assert.deepEqual(
+      redacted.rows[0]!.data.evaluations.find((row) => row.id === draftId)?.comments,
+      {}
+    );
+    assert.deepEqual(
+      await admin
+        .query("SELECT to_jsonb(e) AS data FROM public.evaluations e WHERE id=$1", [reviewer.id])
+        .then((result) => result.rows),
+      reviewerBefore.rows
+    );
+    const writeRoles = await admin.query<{ denied: boolean }>(
+      `SELECT NOT has_function_privilege(r, 'platform.ladders_save_my_evaluation(uuid,uuid,uuid,jsonb)', 'EXECUTE')
+        AND NOT has_function_privilege(r, 'platform.ladders_publish_my_evaluation(uuid,uuid,uuid)', 'EXECUTE')
+        AND NOT has_function_privilege(r, 'platform.ladders_my_self_evaluations(uuid,uuid)', 'EXECUTE') AS denied
+       FROM unnest(ARRAY['anon','authenticated','service_role']) r`
+    );
+    assert.ok(writeRoles.rows.every((row) => row.denied));
+    await assert.rejects(
+      restricted.query("SELECT platform.ladders_lock_my_member($1,$2)", [employee.id, member]),
+      /permission denied/
+    );
     await runPermissionCommand(admin, ["unmap-legacy", employee.id, legacy]);
     assert.deepEqual(await api.laddersMyMembers(employee.id), []);
     await assert.rejects(api.laddersMyEvaluations(employee.id, member), /unavailable/);
     assert.deepEqual((await api.account(identity)).grants, []);
+    await assert.rejects(api.laddersMySelfEvaluations(employee.id, member), /unavailable/);
+    await assert.rejects(
+      api.laddersSaveMyEvaluation(employee.id, member, newDraft.rows[0]!.id, content),
+      /unavailable/
+    );
+    await assert.rejects(
+      api.laddersPublishMyEvaluation(employee.id, member, newDraft.rows[0]!.id),
+      /unavailable/
+    );
   } finally {
     await admin.query("ROLLBACK");
     await admin.query("DELETE FROM platform.legacy_account_mappings WHERE legacy_user_id=$1", [

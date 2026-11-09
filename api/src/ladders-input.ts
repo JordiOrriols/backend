@@ -80,6 +80,19 @@ export interface SmartGoalInput {
   due_date: string | null;
   progress: number;
 }
+export function goalProgressInput(body: unknown): number {
+  if (
+    !body ||
+    typeof body !== "object" ||
+    !("progress" in body) ||
+    typeof body.progress !== "number" ||
+    !Number.isInteger(body.progress) ||
+    body.progress < 0 ||
+    body.progress > 100
+  )
+    throw new BadRequestException("Invalid goal progress");
+  return body.progress;
+}
 export function smartGoalInput(body: unknown): SmartGoalInput {
   if (
     !body ||

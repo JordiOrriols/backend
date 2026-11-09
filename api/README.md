@@ -2,7 +2,7 @@
 
 This isolated branch adds a NestJS/TypeScript API and plain PostgreSQL 17.
 It does not modify production workflows or publish packages.
-The Pulse/Agents adapters, shared workspace lifecycle and employee editing
+The Pulse/Agents adapters, shared workspace lifecycle and authenticated peer
 workflows are not migrated yet. Explicit legacy account mappings can be
 provisioned by the isolated administrator tool; they do not infer permissions.
 
@@ -24,7 +24,8 @@ team/member directory with team creation/renaming. Apply `sql/001-projections.sq
 `sql/023-ladders-evaluation-editing.sql`,
 `sql/024-ladders-evaluation-deletion.sql` and
 `sql/025-ladders-smart-goals.sql`, `sql/026-legacy-account-mapping.sql` and
-`sql/027-ladders-employee-view.sql` and `sql/028-ladders-self-evaluations.sql` to the isolated
+`sql/027-ladders-employee-view.sql`, `sql/028-ladders-self-evaluations.sql` and
+`sql/029-ladders-employee-goals.sql` to the isolated
 database using its local Compose `exec db psql` command; never apply it to the
 production database. Fresh imports apply these API SQL files automatically.
 The API's workspace directory only lists explicit app/workspace grants.
@@ -141,6 +142,16 @@ The frontend reuses the existing manager editor's extracted rendering and shared
 autosave hook, hides manager-only goal/visibility controls and never enables
 profile changes, deletion or unpublishing. Failed autosaves remain visible.
 
+Employees read their own goals using `GET /api/ladders/me/members/:member/goals`.
+`PATCH .../goals/:goal/progress` accepts only an integer progress of 0-100;
+`POST .../goals/:goal/comments` appends text with server-generated identity/time
+and `authorKind: member`. Neither route changes title, description, due date,
+membership, previous comments or ownership. Existing legacy comments survive.
+The same mapping/member locks serialize updates and concurrent comment appends.
+Foreign goals/members and unmapped accounts are denied, independently of any
+workspace grant. Employees cannot create or delete goals. The existing member
+mode of `SmartGoalsPanel` is reused for progress and comments, with no new form.
+
 Internal Ladders owner/editor/viewer grants read
 `GET /api/ladders/workspaces/:workspace/members/:member/evaluations`.
 The explicit projection returns evaluation ID/member ID/kind/status/author name,
@@ -169,7 +180,8 @@ Runtime direct UPDATE is denied; legacy evaluation integrity triggers remain
 enabled and content/status/identity/timestamps are unchanged. Integration
 verifies the existing legacy employee projection redacts hidden notes on the
 server and respects per-category peer approval. That projection is not exposed
-through anonymous API routes; authenticated employee mapping/access is pending.
+through anonymous API routes; authenticated employee reads apply these same
+redaction rules through explicit identity mappings.
 The frontend extracts the existing assessment control into one shared panel,
 retaining legacy behavior, translated labels/errors and autosave busy gating.
 
@@ -191,7 +203,8 @@ never approves its comments implicitly. Existing evaluation integrity triggers
 stay enabled; runtime direct INSERT/UPDATE is denied. Responses use the explicit
 history projection. The frontend reuses the existing queued 500ms autosave hook,
 assessment form and version panel through a typed store; no legacy auth/database
-adapter is initialized. Employee workflows remain pending.
+adapter is initialized. Authenticated self evaluation editing uses the separate
+member-scoped routes described above; peer assignments remain pending.
 
 Only owners delete evaluations with
 `DELETE .../members/:member/evaluations/:evaluation`. The function locks the
@@ -478,8 +491,9 @@ of being reassigned. Unmapping requires both exact IDs. Mapping never creates
 grants, changes legacy owner/member FKs, or merges verified subjects; unmapping
 never revokes independently provisioned workspace grants. The runtime role and
 legacy browser roles cannot read or modify the mapping table, and `/api/me`
-does not expose it. This is the identity foundation, not yet employee access,
-member invitation acceptance or a production mapping procedure.
+does not expose it. Employee reads, self evaluation edits and goal progress/comments
+consume the mapping only when an existing member-account link also matches.
+Member invitation acceptance and a production mapping procedure remain pending.
 
 Apps: `planner`, `shiplog`, `ladders`, `pulse`, `agents`.
 Roles: `owner`, `editor`, `viewer`, `external` (last only for Planner/Shiplog).

@@ -6,6 +6,7 @@ import {
   evaluationContentInput,
   evaluationStatusInput,
   goalCommentInput,
+  goalProgressInput,
   smartGoalInput,
 } from "../src/ladders-input.js";
 
@@ -84,6 +85,22 @@ test("SMART goal input trims titles and validates progress, dates and append-onl
   assert.equal(goalCommentInput({ text: " note ", authorKind: "member" }), "note");
   for (const body of [null, [], {}, { text: " " }, { text: "😀".repeat(10001) }, { text: 1 }])
     assert.throws(() => goalCommentInput(body));
+});
+
+test("employee goal progress requires a whole percentage and ignores definition or comment injection", () => {
+  for (const progress of [0, 50, 100])
+    assert.equal(goalProgressInput({ progress, title: "spoof", comments: ["spoof"] }), progress);
+  for (const body of [
+    null,
+    [],
+    {},
+    { progress: "50" },
+    { progress: 10.5 },
+    { progress: -1 },
+    { progress: 101 },
+    { progress: Infinity },
+  ])
+    assert.throws(() => goalProgressInput(body));
 });
 
 test("member profiles validate complete fields and Unicode limits while ignoring identities and tokens", () => {

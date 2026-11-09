@@ -258,6 +258,86 @@ test("employee evaluations require explicit mapping and member ownership, redact
       restricted.query("SELECT platform.ladders_lock_my_member($1,$2)", [employee.id, member]),
       /permission denied/
     );
+    const goal = randomUUID(),
+      foreignGoal = randomUUID();
+    const legacyNote = {
+      id: randomUUID(),
+      text: "Legacy note",
+      createdAt: "2026-10-01T00:00:00Z",
+      authorKind: "legacy",
+    };
+    await admin.query(
+      `INSERT INTO public.smart_goals(id,member_id,title,description,due_date,comments) VALUES
+      ($1,$2,'Manager goal','Definition','2026-12-01',$5),
+      ($3,$4,'Other goal','Other definition',null,'[]')`,
+      [goal, member, foreignGoal, foreignMember, JSON.stringify([legacyNote])]
+    );
+    const goalBefore = await admin.query<{ data: Record<string, unknown> }>(
+      "SELECT to_jsonb(g)-'updated_at'-'progress'-'comments' AS data FROM public.smart_goals g WHERE id=$1",
+      [goal]
+    );
+    const ownGoals = await api.laddersMyGoals(employee.id, member);
+    assert.ok(Array.isArray(ownGoals) && ownGoals.length === 1);
+    assert.equal(ownGoals[0].id, goal);
+    await assert.rejects(api.laddersMyGoals(sameEmail.id, member), /unavailable/);
+    await assert.rejects(api.laddersMyGoals(employee.id, foreignMember), /unavailable/);
+    await assert.rejects(
+      api.laddersUpdateMyGoal(employee.id, member, foreignGoal, 50, null),
+      /unavailable/
+    );
+    await assert.rejects(
+      api.laddersUpdateMyGoal(sameEmail.id, member, goal, 50, null),
+      /unavailable/
+    );
+    for (const progress of [-1, 101])
+      await assert.rejects(
+        api.laddersUpdateMyGoal(employee.id, member, goal, progress, null),
+        /Invalid goal/
+      );
+    for (const comment of ["", " ", "x".repeat(10001)])
+      await assert.rejects(
+        api.laddersUpdateMyGoal(employee.id, member, goal, null, comment),
+        /Invalid goal/
+      );
+    await assert.rejects(
+      api.laddersUpdateMyGoal(employee.id, member, goal, null, null),
+      /Invalid goal/
+    );
+    await assert.rejects(
+      api.laddersUpdateMyGoal(employee.id, member, goal, 20, "two updates"),
+      /Invalid goal/
+    );
+    await api.laddersUpdateMyGoal(employee.id, member, goal, 70, null);
+    await Promise.all([
+      api.laddersUpdateMyGoal(employee.id, member, goal, null, " Employee note one "),
+      api.laddersUpdateMyGoal(employee.id, member, goal, null, "Employee note two"),
+    ]);
+    const goalAfter = await admin.query<{
+      progress: number;
+      comments: { text: string; authorKind?: string }[];
+      data: unknown;
+    }>(
+      "SELECT progress,comments,to_jsonb(g)-'updated_at'-'progress'-'comments' AS data FROM public.smart_goals g WHERE id=$1",
+      [goal]
+    );
+    assert.equal(goalAfter.rows[0]!.progress, 70);
+    assert.deepEqual(goalAfter.rows[0]!.data, goalBefore.rows[0]!.data);
+    assert.deepEqual(goalAfter.rows[0]!.comments[0], legacyNote);
+    assert.deepEqual(
+      goalAfter.rows[0]!.comments.slice(1)
+        .map((comment) => comment.text)
+        .sort(),
+      ["Employee note one", "Employee note two"]
+    );
+    assert.ok(
+      goalAfter.rows[0]!.comments.slice(1).every((comment) => comment.authorKind === "member")
+    );
+    const goalRoles = await admin.query<{ denied: boolean }>(
+      `SELECT NOT has_function_privilege(r, 'platform.ladders_my_goals(uuid,uuid)', 'EXECUTE')
+        AND NOT has_function_privilege(r, 'platform.ladders_update_my_goal(uuid,uuid,uuid,smallint,text)', 'EXECUTE') AS denied
+       FROM unnest(ARRAY['anon','authenticated','service_role']) r`
+    );
+    assert.ok(goalRoles.rows.every((row) => row.denied));
     await runPermissionCommand(admin, ["unmap-legacy", employee.id, legacy]);
     assert.deepEqual(await api.laddersMyMembers(employee.id), []);
     await assert.rejects(api.laddersMyEvaluations(employee.id, member), /unavailable/);
@@ -269,6 +349,15 @@ test("employee evaluations require explicit mapping and member ownership, redact
     );
     await assert.rejects(
       api.laddersPublishMyEvaluation(employee.id, member, newDraft.rows[0]!.id),
+      /unavailable/
+    );
+    await assert.rejects(api.laddersMyGoals(employee.id, member), /unavailable/);
+    await assert.rejects(
+      api.laddersUpdateMyGoal(employee.id, member, goal, 100, null),
+      /unavailable/
+    );
+    await assert.rejects(
+      api.laddersUpdateMyGoal(employee.id, member, goal, null, "Revoked"),
       /unavailable/
     );
   } finally {

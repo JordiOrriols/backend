@@ -27,6 +27,7 @@ import {
   evaluationContentInput,
   evaluationStatusInput,
   goalCommentInput,
+  goalProgressInput,
   smartGoalInput,
 } from "./ladders-input.js";
 import { buildPublicRoadmap, hasHolidayCalendar, validateSprintSettings } from "./scheduler.mjs";
@@ -64,6 +65,35 @@ const database = new PlatformDatabase(required("DATABASE_URL"));
 
 @Controller("api")
 class PlatformController {
+  @Get("ladders/me/members/:member/goals")
+  async laddersMyGoals(
+    @Headers("cf-access-jwt-assertion") token: string | undefined,
+    @Param("member", new ParseUUIDPipe()) member: string
+  ) {
+    return this.execute(token, (id) => database.laddersMyGoals(id, member));
+  }
+  @Patch("ladders/me/members/:member/goals/:goal/progress")
+  async laddersMyGoalProgress(
+    @Headers("cf-access-jwt-assertion") token: string | undefined,
+    @Param("member", new ParseUUIDPipe()) member: string,
+    @Param("goal", new ParseUUIDPipe()) goal: string,
+    @Body() body: unknown
+  ) {
+    return this.execute(token, (id) =>
+      database.laddersUpdateMyGoal(id, member, goal, goalProgressInput(body), null)
+    );
+  }
+  @Post("ladders/me/members/:member/goals/:goal/comments")
+  async laddersMyGoalComment(
+    @Headers("cf-access-jwt-assertion") token: string | undefined,
+    @Param("member", new ParseUUIDPipe()) member: string,
+    @Param("goal", new ParseUUIDPipe()) goal: string,
+    @Body() body: unknown
+  ) {
+    return this.execute(token, (id) =>
+      database.laddersUpdateMyGoal(id, member, goal, null, goalCommentInput(body))
+    );
+  }
   @Get("ladders/me/members/:member/self-evaluations")
   async laddersMySelfEvaluations(
     @Headers("cf-access-jwt-assertion") token: string | undefined,

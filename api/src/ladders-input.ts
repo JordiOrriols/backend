@@ -1,5 +1,5 @@
 import { BadRequestException } from "@nestjs/common";
-import { planningRoleInput, type PlanningRole } from "./planner-input.js";
+import { dateInput, planningRoleInput, type PlanningRole } from "./planner-input.js";
 
 const categories = ["Technology", "System", "People", "Process", "Influence"];
 export interface EvaluationContent {
@@ -73,6 +73,52 @@ export interface MemberProfileInput {
   role: string;
   planning_role: PlanningRole | null;
   template_id: string | null;
+}
+export interface SmartGoalInput {
+  title: string;
+  description: string;
+  due_date: string | null;
+  progress: number;
+}
+export function smartGoalInput(body: unknown): SmartGoalInput {
+  if (
+    !body ||
+    typeof body !== "object" ||
+    Array.isArray(body) ||
+    !("title" in body) ||
+    typeof body.title !== "string" ||
+    !body.title.trim() ||
+    Array.from(body.title.trim()).length > 160 ||
+    !("description" in body) ||
+    typeof body.description !== "string" ||
+    !("due_date" in body) ||
+    (body.due_date !== null && typeof body.due_date !== "string") ||
+    !("progress" in body) ||
+    typeof body.progress !== "number" ||
+    !Number.isInteger(body.progress) ||
+    body.progress < 0 ||
+    body.progress > 100
+  )
+    throw new BadRequestException("Invalid SMART goal");
+  return {
+    title: body.title.trim(),
+    description: body.description,
+    due_date: body.due_date === null ? null : dateInput({ date: body.due_date }),
+    progress: body.progress,
+  };
+}
+export function goalCommentInput(body: unknown): string {
+  if (
+    !body ||
+    typeof body !== "object" ||
+    Array.isArray(body) ||
+    !("text" in body) ||
+    typeof body.text !== "string" ||
+    !body.text.trim() ||
+    Array.from(body.text.trim()).length > 10000
+  )
+    throw new BadRequestException("Comment must contain 1 to 10000 characters");
+  return body.text.trim();
 }
 export function memberProfileInput(body: unknown): MemberProfileInput {
   if (

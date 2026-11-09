@@ -26,6 +26,8 @@ import {
   commentVisibilityInput,
   evaluationContentInput,
   evaluationStatusInput,
+  goalCommentInput,
+  smartGoalInput,
 } from "./ladders-input.js";
 import { buildPublicRoadmap, hasHolidayCalendar, validateSprintSettings } from "./scheduler.mjs";
 import {
@@ -62,6 +64,58 @@ const database = new PlatformDatabase(required("DATABASE_URL"));
 
 @Controller("api")
 class PlatformController {
+  @Get("ladders/workspaces/:workspace/members/:member/goals")
+  async laddersGoals(
+    @Headers("cf-access-jwt-assertion") token: string | undefined,
+    @Param("workspace", new ParseUUIDPipe()) workspace: string,
+    @Param("member", new ParseUUIDPipe()) member: string
+  ) {
+    return this.execute(token, (id) => database.laddersGoals(id, workspace, member));
+  }
+  @Post("ladders/workspaces/:workspace/members/:member/goals")
+  async laddersCreateGoal(
+    @Headers("cf-access-jwt-assertion") token: string | undefined,
+    @Param("workspace", new ParseUUIDPipe()) workspace: string,
+    @Param("member", new ParseUUIDPipe()) member: string,
+    @Body() body: unknown
+  ) {
+    return this.execute(token, (id) =>
+      database.laddersSaveGoal(id, workspace, member, null, smartGoalInput(body))
+    );
+  }
+  @Patch("ladders/workspaces/:workspace/members/:member/goals/:goal")
+  async laddersUpdateGoal(
+    @Headers("cf-access-jwt-assertion") token: string | undefined,
+    @Param("workspace", new ParseUUIDPipe()) workspace: string,
+    @Param("member", new ParseUUIDPipe()) member: string,
+    @Param("goal", new ParseUUIDPipe()) goal: string,
+    @Body() body: unknown
+  ) {
+    return this.execute(token, (id) =>
+      database.laddersSaveGoal(id, workspace, member, goal, smartGoalInput(body))
+    );
+  }
+  @Post("ladders/workspaces/:workspace/members/:member/goals/:goal/comments")
+  async laddersAppendGoalComment(
+    @Headers("cf-access-jwt-assertion") token: string | undefined,
+    @Param("workspace", new ParseUUIDPipe()) workspace: string,
+    @Param("member", new ParseUUIDPipe()) member: string,
+    @Param("goal", new ParseUUIDPipe()) goal: string,
+    @Body() body: unknown
+  ) {
+    return this.execute(token, (id) =>
+      database.laddersAppendGoalComment(id, workspace, member, goal, goalCommentInput(body))
+    );
+  }
+  @Delete("ladders/workspaces/:workspace/members/:member/goals/:goal")
+  async laddersDeleteGoal(
+    @Headers("cf-access-jwt-assertion") token: string | undefined,
+    @Param("workspace", new ParseUUIDPipe()) workspace: string,
+    @Param("member", new ParseUUIDPipe()) member: string,
+    @Param("goal", new ParseUUIDPipe()) goal: string
+  ) {
+    return this.execute(token, (id) => database.laddersDeleteGoal(id, workspace, member, goal));
+  }
   @Post("ladders/workspaces/:workspace/members/:member/evaluations")
   async laddersCreateEvaluation(
     @Headers("cf-access-jwt-assertion") token: string | undefined,

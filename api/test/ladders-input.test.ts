@@ -5,6 +5,8 @@ import {
   commentVisibilityInput,
   evaluationContentInput,
   evaluationStatusInput,
+  goalCommentInput,
+  smartGoalInput,
 } from "../src/ladders-input.js";
 
 test("evaluation content validates legacy half-step and comment limits without accepting identity or visibility fields", () => {
@@ -46,6 +48,42 @@ test("comment visibility requires an explicit boolean and ignores injected field
   assert.equal(commentVisibilityInput({ visible: false }), false);
   for (const body of [null, [], {}, { visible: "true" }, { visible: 1 }, { visible: null }])
     assert.throws(() => commentVisibilityInput(body));
+});
+
+test("SMART goal input trims titles and validates progress, dates and append-only comments", () => {
+  const input = {
+    title: " Goal ",
+    description: " Description ",
+    due_date: "2026-02-28",
+    progress: 100,
+  };
+  assert.deepEqual(
+    smartGoalInput({
+      ...input,
+      member_id: "spoof",
+      comments: [{ text: "spoof" }],
+      created_at: "spoof",
+    }),
+    { ...input, title: "Goal" }
+  );
+  assert.deepEqual(smartGoalInput({ ...input, due_date: null, progress: 0 }).due_date, null);
+  for (const body of [
+    null,
+    [],
+    {},
+    { ...input, title: " " },
+    { ...input, title: "😀".repeat(161) },
+    { ...input, description: 1 },
+    { ...input, due_date: "2026-02-30" },
+    { ...input, due_date: undefined },
+    { ...input, progress: -1 },
+    { ...input, progress: 101 },
+    { ...input, progress: 10.5 },
+  ])
+    assert.throws(() => smartGoalInput(body));
+  assert.equal(goalCommentInput({ text: " note ", authorKind: "member" }), "note");
+  for (const body of [null, [], {}, { text: " " }, { text: "😀".repeat(10001) }, { text: 1 }])
+    assert.throws(() => goalCommentInput(body));
 });
 
 test("member profiles validate complete fields and Unicode limits while ignoring identities and tokens", () => {

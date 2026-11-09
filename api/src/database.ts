@@ -1,6 +1,6 @@
 import { Pool } from "pg";
 import type { AccessIdentity } from "./access.js";
-import type { MemberProfileInput, EvaluationContent } from "./ladders-input.js";
+import type { MemberProfileInput, EvaluationContent, SmartGoalInput } from "./ladders-input.js";
 import type { ApplicationInput, ReleaseInput, ChecklistInput } from "./shiplog-input.js";
 import type {
   PriorityInput,
@@ -68,6 +68,60 @@ export class PlatformDatabase {
     const result = await this.pool.query<{ data: unknown }>(
       "SELECT platform.ladders_delete_evaluation($1,$2,$3,$4) AS data",
       [account, workspace, member, evaluation]
+    );
+    return result.rows[0]!.data;
+  }
+  async laddersGoals(account: string, workspace: string, member: string): Promise<unknown> {
+    const result = await this.pool.query<{ data: unknown }>(
+      "SELECT platform.ladders_goals($1,$2,$3) AS data",
+      [account, workspace, member]
+    );
+    return result.rows[0]!.data;
+  }
+  async laddersSaveGoal(
+    account: string,
+    workspace: string,
+    member: string,
+    goal: string | null,
+    input: SmartGoalInput
+  ): Promise<unknown> {
+    const result = await this.pool.query<{ data: unknown }>(
+      "SELECT platform.ladders_save_goal($1,$2,$3,$4,$5,$6,$7,$8) AS data",
+      [
+        account,
+        workspace,
+        member,
+        goal,
+        input.title,
+        input.description,
+        input.due_date,
+        input.progress,
+      ]
+    );
+    return result.rows[0]!.data;
+  }
+  async laddersAppendGoalComment(
+    account: string,
+    workspace: string,
+    member: string,
+    goal: string,
+    comment: string
+  ): Promise<unknown> {
+    const result = await this.pool.query<{ data: unknown }>(
+      "SELECT platform.ladders_append_goal_comment($1,$2,$3,$4,$5) AS data",
+      [account, workspace, member, goal, comment]
+    );
+    return result.rows[0]!.data;
+  }
+  async laddersDeleteGoal(
+    account: string,
+    workspace: string,
+    member: string,
+    goal: string
+  ): Promise<unknown> {
+    const result = await this.pool.query<{ data: unknown }>(
+      "SELECT platform.ladders_delete_goal($1,$2,$3,$4) AS data",
+      [account, workspace, member, goal]
     );
     return result.rows[0]!.data;
   }

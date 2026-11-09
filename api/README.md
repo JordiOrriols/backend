@@ -2,8 +2,8 @@
 
 This isolated branch adds a NestJS/TypeScript API and plain PostgreSQL 17.
 It does not modify production workflows or publish packages.
-Ladders goals, the Pulse/Agents adapters, shared workspace lifecycle and explicit
-legacy account mapping are not migrated yet.
+The Pulse/Agents adapters, shared workspace lifecycle and explicit legacy
+account mapping are not migrated yet.
 
 The Shiplog and Planner isolated worktrees implement reduced views
 at `/shiplog/workspaces/:workspace/releases` and
@@ -20,13 +20,21 @@ team/member directory with team creation/renaming. Apply `sql/001-projections.sq
 `sql/016-ladders-teams.sql` and `sql/017-ladders-profiles.sql`, `sql/018-ladders-deletion.sql` and
 `sql/019-ladders-members.sql`, `sql/020-ladders-member-moves.sql` and
 `sql/021-ladders-evaluation-history.sql`, `sql/022-ladders-comment-visibility.sql` and
-`sql/023-ladders-evaluation-editing.sql` and
-`sql/024-ladders-evaluation-deletion.sql` to the isolated
+`sql/023-ladders-evaluation-editing.sql`,
+`sql/024-ladders-evaluation-deletion.sql` and
+`sql/025-ladders-smart-goals.sql` to the isolated
 database using its local Compose `exec db psql` command; never apply it to the
 production database. Fresh imports apply these API SQL files automatically.
 The API's workspace directory only lists explicit app/workspace grants.
 Catalog responses reuse the existing reduced release projection, without
 private engineering notes, audit entries or token settings.
+
+Ladders goals use scoped `GET/POST /api/ladders/workspaces/:workspace/members/:member/goals`,
+`PATCH/DELETE .../goals/:goal`, and `POST .../goals/:goal/comments` routes.
+Owners/editors can create, edit, track progress and append manager comments;
+viewers can read and only owners can delete. Definer functions lock the explicit
+grant and workspace/member scope, preserve immutable comment history, and deny
+direct access to the legacy table for the runtime API role.
 
 Ladders internal grants read `GET /api/ladders/workspaces/:workspace/teams`.
 The response contains team IDs/names and member IDs/team IDs/names/roles/planning
@@ -39,8 +47,12 @@ Planner grants do not confer Ladders access; same-email subjects remain distinct
 The isolated Ladders worktree serves authenticated hash-free `/ladders/` routes
 through the local gateway on port 5320 (direct app port 5314). It reuses UI layout,
 language/footer and team-name dialogs without initializing old browser Supabase
-or password/anonymous flows. Goals and
-shared lifecycle remain pending; the draft is not a production replacement.
+or password/anonymous flows. SMART goals reuse the existing member profile panel.
+Owners/editors can create and edit goals, update progress, and append manager
+comments; viewers are read-only and only owners may delete. Scoped functions
+preserve legacy comment history, enforce append-only comments, reject foreign
+member/goal IDs and keep direct runtime table access denied. Shared lifecycle
+remains pending; the draft is not a production replacement.
 
 Owners/editors update member profiles with
 `PATCH /api/ladders/workspaces/:workspace/members/:member`, supplying explicit

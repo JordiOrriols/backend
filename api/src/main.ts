@@ -109,6 +109,17 @@ class PlatformController {
       )
     );
   }
+  @Delete("ladders/workspaces/:workspace/members/:member/evaluations/:evaluation")
+  async laddersDeleteEvaluation(
+    @Headers("cf-access-jwt-assertion") token: string | undefined,
+    @Param("workspace", new ParseUUIDPipe()) workspace: string,
+    @Param("member", new ParseUUIDPipe()) member: string,
+    @Param("evaluation", new ParseUUIDPipe()) evaluation: string
+  ) {
+    return this.execute(token, (id) =>
+      database.laddersDeleteEvaluation(id, workspace, member, evaluation)
+    );
+  }
   @Patch("ladders/workspaces/:workspace/members/:member/evaluations/:evaluation/comments/:category")
   async laddersCommentVisibility(
     @Headers("cf-access-jwt-assertion") token: string | undefined,

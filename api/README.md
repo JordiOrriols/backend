@@ -2,8 +2,8 @@
 
 This isolated branch adds a NestJS/TypeScript API and plain PostgreSQL 17.
 It does not modify production workflows or publish packages.
-Ladders evaluation deletion/goals, the Pulse/Agents adapters, shared workspace
-lifecycle and explicit legacy account mapping are not migrated yet.
+Ladders goals, the Pulse/Agents adapters, shared workspace lifecycle and explicit
+legacy account mapping are not migrated yet.
 
 The Shiplog and Planner isolated worktrees implement reduced views
 at `/shiplog/workspaces/:workspace/releases` and
@@ -20,7 +20,8 @@ team/member directory with team creation/renaming. Apply `sql/001-projections.sq
 `sql/016-ladders-teams.sql` and `sql/017-ladders-profiles.sql`, `sql/018-ladders-deletion.sql` and
 `sql/019-ladders-members.sql`, `sql/020-ladders-member-moves.sql` and
 `sql/021-ladders-evaluation-history.sql`, `sql/022-ladders-comment-visibility.sql` and
-`sql/023-ladders-evaluation-editing.sql` to the isolated
+`sql/023-ladders-evaluation-editing.sql` and
+`sql/024-ladders-evaluation-deletion.sql` to the isolated
 database using its local Compose `exec db psql` command; never apply it to the
 production database. Fresh imports apply these API SQL files automatically.
 The API's workspace directory only lists explicit app/workspace grants.
@@ -38,7 +39,7 @@ Planner grants do not confer Ladders access; same-email subjects remain distinct
 The isolated Ladders worktree serves authenticated hash-free `/ladders/` routes
 through the local gateway on port 5320 (direct app port 5314). It reuses UI layout,
 language/footer and team-name dialogs without initializing old browser Supabase
-or password/anonymous flows. Evaluation deletion, goals and
+or password/anonymous flows. Goals and
 shared lifecycle remain pending; the draft is not a production replacement.
 
 Owners/editors update member profiles with
@@ -147,7 +148,16 @@ never approves its comments implicitly. Existing evaluation integrity triggers
 stay enabled; runtime direct INSERT/UPDATE is denied. Responses use the explicit
 history projection. The frontend reuses the existing queued 500ms autosave hook,
 assessment form and version panel through a typed store; no legacy auth/database
-adapter is initialized. Evaluation deletion and employee workflows remain pending.
+adapter is initialized. Employee workflows remain pending.
+
+Only owners delete evaluations with
+`DELETE .../members/:member/evaluations/:evaluation`. The function locks the
+explicit owner grant, workspace and target evaluation, and verifies the member
+and evaluation belong to that workspace. Editors/viewers, foreign or missing
+targets are denied. Published self evaluations can be deleted by the owner, but
+self drafts remain private and return 404 even when their ID is known. The
+response is the refreshed internal history; runtime direct table deletion stays
+denied. The existing version-panel confirmation and permission check are reused.
 
 Internal Shiplog grants can read `GET .../applications`, returning explicit
 application fields, an `in_use` flag and workspace team IDs/names. External

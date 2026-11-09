@@ -59,6 +59,18 @@ export class PlatformDatabase {
     );
     return result.rows[0]!.data;
   }
+  async laddersDeleteEvaluation(
+    account: string,
+    workspace: string,
+    member: string,
+    evaluation: string
+  ): Promise<unknown> {
+    const result = await this.pool.query<{ data: unknown }>(
+      "SELECT platform.ladders_delete_evaluation($1,$2,$3,$4) AS data",
+      [account, workspace, member, evaluation]
+    );
+    return result.rows[0]!.data;
+  }
   async laddersCommentVisibility(
     account: string,
     workspace: string,
